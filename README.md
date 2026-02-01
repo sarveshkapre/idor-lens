@@ -29,6 +29,14 @@ Generate a starter `spec.yml`:
 python -m idor_lens init --out spec.yml --base-url https://example.test
 ```
 
+## Validate a spec
+
+Validate structure and (optionally) fail if env vars are missing:
+
+```bash
+python -m idor_lens validate --spec spec.yml --require-env
+```
+
 ### Auth realism (cookies + preflight)
 
 Many apps need cookies/CSRF/bootstrap requests before protected endpoints behave realistically.

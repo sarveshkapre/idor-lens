@@ -9,6 +9,7 @@ from .jsonl import open_text_out
 from .report import write_html_report
 from .runner import run_test
 from .template import SpecTemplateOptions, render_spec_template
+from .validate import validate_spec
 
 
 def _version_str() -> str:
@@ -124,6 +125,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_init.set_defaults(func=_init)
 
+    p_validate = sub.add_parser("validate", help="Validate a YAML spec without running requests")
+    p_validate.add_argument("--spec", required=True, help="Path to YAML spec file")
+    p_validate.add_argument(
+        "--require-env",
+        action="store_true",
+        help="Fail if any $VARS remain unexpanded after env substitution",
+    )
+    p_validate.set_defaults(func=_validate)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -175,6 +185,10 @@ def _init(args: argparse.Namespace) -> int:
     with open_text_out(out_path) as out:
         out.write(content)
     return 0
+
+
+def _validate(args: argparse.Namespace) -> int:
+    return validate_spec(Path(args.spec), require_env=bool(args.require_env))
 
 
 if __name__ == "__main__":

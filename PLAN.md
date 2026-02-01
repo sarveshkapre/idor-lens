@@ -41,6 +41,7 @@ python -m idor_lens --help
 - `idor-lens init` to generate a starter `spec.yml`.
 - Retry/backoff controls for transient errors.
 - Per-role/per-endpoint timeout overrides.
+- `idor-lens validate` (fail fast on missing env vars).
 
 ## Next (tight scope)
 

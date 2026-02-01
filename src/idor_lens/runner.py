@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
-import yaml
+
+from .spec import load_spec
 
 
 _DEFAULT_MAX_BYTES = 1024 * 1024
@@ -76,26 +76,6 @@ class Finding:
             "victim_error": self.victim_error,
             "attacker_error": self.attacker_error,
         }
-
-
-def _load_spec(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise SystemExit("spec must be a YAML mapping")
-    expanded = _expand_env(data)
-    if not isinstance(expanded, dict):
-        raise SystemExit("spec must be a YAML mapping")
-    return cast(dict[str, Any], expanded)
-
-
-def _expand_env(value: Any) -> Any:
-    if isinstance(value, str):
-        return os.path.expandvars(value)
-    if isinstance(value, list):
-        return [_expand_env(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _expand_env(v) for k, v in value.items()}
-    return value
 
 
 def _as_str_dict(value: Any, *, name: str) -> dict[str, str]:
@@ -345,7 +325,7 @@ def run_test(
     retries: int | None = None,
     retry_backoff_s: float | None = None,
 ) -> int:
-    spec = _load_spec(spec_path)
+    spec = load_spec(spec_path)
     base_url = spec.get("base_url")
     if not base_url:
         raise SystemExit("missing base_url in spec")
