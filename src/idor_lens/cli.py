@@ -5,8 +5,10 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from .compare import compare_jsonl, write_compare_output
+from .jsonl import open_text_out
 from .report import write_html_report
 from .runner import run_test
+from .template import SpecTemplateOptions, render_spec_template
 
 
 def _version_str() -> str:
@@ -87,6 +89,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_compare.set_defaults(func=_compare)
 
+    p_init = sub.add_parser("init", help="Write a sample YAML spec")
+    p_init.add_argument("--out", default="spec.yml", help="Path to write, or '-' for stdout")
+    p_init.add_argument(
+        "--base-url", default="https://example.test", help="Base URL for target service"
+    )
+    p_init.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite output file if it already exists",
+    )
+    p_init.set_defaults(func=_init)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -117,6 +131,18 @@ def _compare(args: argparse.Namespace) -> int:
     )
     write_compare_output(summary, Path(args.out), as_json=bool(args.json))
     return 2 if (bool(args.fail_on_new) and summary.new_vulnerable) else 0
+
+
+def _init(args: argparse.Namespace) -> int:
+    out_path = Path(args.out)
+    content = render_spec_template(SpecTemplateOptions(base_url=str(args.base_url)))
+
+    if str(out_path) != "-" and out_path.exists() and not bool(args.force):
+        raise SystemExit(f"refusing to overwrite existing file: {out_path} (use --force)")
+
+    with open_text_out(out_path) as out:
+        out.write(content)
+    return 0
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@
 
 - `idor-lens report` renders a clean HTML report from JSONL output.
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
+- `idor-lens init` writes a starter YAML spec.
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).
 - `idor-lens run` supports `--proxy` and `--insecure`.

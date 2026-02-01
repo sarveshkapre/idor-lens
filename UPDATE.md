@@ -9,6 +9,7 @@
 - Added env var expansion in spec strings (`$VAR` / `${VAR}`) to avoid hardcoding secrets.
 - When using `--out -`, the run summary is printed to stderr to keep stdout as pure JSONL.
 - Added `--proxy` and `--insecure` for better local testing (Burp/self-signed TLS).
+- Added `idor-lens init` to generate a starter `spec.yml`.
 
 ## How to run
 

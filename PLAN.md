@@ -38,11 +38,13 @@ python -m idor_lens --help
 - `idor-lens compare` baseline vs current regression mode (new vulns only).
 - Cookie + preflight support for more realistic auth flows.
 - Env var expansion in spec strings (avoid hardcoding secrets).
+- `idor-lens init` to generate a starter `spec.yml`.
 
 ## Next (tight scope)
 
 - Add baseline regression compare mode (fail only on new vulns).
 - Improve auth realism (cookie support and/or preflight requests).
+  - Add per-endpoint cookie overrides if needed.
 
 ## Non-goals (near-term)
 

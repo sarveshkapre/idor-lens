@@ -21,6 +21,14 @@ make check
 python -m idor_lens run --spec spec.yml --out idor-report.jsonl
 ```
 
+## Create a spec
+
+Generate a starter `spec.yml`:
+
+```bash
+python -m idor_lens init --out spec.yml --base-url https://example.test
+```
+
 ### Auth realism (cookies + preflight)
 
 Many apps need cookies/CSRF/bootstrap requests before protected endpoints behave realistically.
