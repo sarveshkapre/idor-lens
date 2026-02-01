@@ -33,6 +33,9 @@ victim:
   # headers:
   #   X-CSRF: ${{VICTIM_CSRF}}
 
+  # Optional default request timeout (seconds):
+  # timeout: 10
+
   # Optional cookie jar (string->string):
   # cookies:
   #   session: ${{VICTIM_SESSION}}
@@ -44,10 +47,14 @@ victim:
 
 attacker:
   auth: Bearer ${{ATTACKER_TOKEN}}
+  # timeout: 10
 
 endpoints:
   - path: /items/123
     method: GET
+    # timeout: 10
+    # victim_timeout: 10
+    # attacker_timeout: 10
     # Optional per-endpoint headers:
     # headers:
     #   Accept: application/json

@@ -12,6 +12,7 @@
 - Added `idor-lens init` to generate a starter `spec.yml`.
 - Added `--follow-redirects`/`--no-follow-redirects` (default: do not follow redirects).
 - Added `--retries`/`--retry-backoff` to stabilize scans against transient failures (timeouts, 429/502/503/504).
+- Added per-role/per-endpoint timeouts in the YAML spec for slow endpoints.
 
 ## How to run
 

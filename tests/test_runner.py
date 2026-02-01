@@ -274,3 +274,40 @@ def test_retries_on_timeout(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
     assert data["victim_attempts"] == 2
     assert data["attacker_attempts"] == 2
+
+
+def test_timeout_overrides_are_applied(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    seen_timeouts: dict[str, float] = {}
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        key = "victim" if auth == "Bearer victim" else "attacker"
+        timeout_val = kwargs.get("timeout")
+        if not isinstance(timeout_val, (int, float)):
+            raise AssertionError("timeout not passed as number")
+        seen_timeouts[key] = float(timeout_val)
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n"
+        "  auth: Bearer victim\n"
+        "  timeout: 0.5\n"
+        "attacker:\n"
+        "  auth: Bearer attacker\n"
+        "  timeout: 0.6\n"
+        "endpoints:\n"
+        "  - path: /items/123\n"
+        "    method: GET\n"
+        "    timeout: 1.2\n"
+        "    victim_timeout: 1.5\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=10.0)
+
+    assert seen_timeouts["victim"] == 1.5
+    assert seen_timeouts["attacker"] == 1.2

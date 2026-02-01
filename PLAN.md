@@ -40,6 +40,7 @@ python -m idor_lens --help
 - Env var expansion in spec strings (avoid hardcoding secrets).
 - `idor-lens init` to generate a starter `spec.yml`.
 - Retry/backoff controls for transient errors.
+- Per-role/per-endpoint timeout overrides.
 
 ## Next (tight scope)
 

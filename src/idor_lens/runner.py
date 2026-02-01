@@ -417,6 +417,15 @@ def run_test(
     victim_cookies = _as_str_dict(victim.get("cookies"), name="victim.cookies")
     attacker_cookies = _as_str_dict(attacker.get("cookies"), name="attacker.cookies")
 
+    victim_timeout_default = _as_float(
+        victim.get("timeout"), name="victim.timeout", default=float(timeout)
+    )
+    attacker_timeout_default = _as_float(
+        attacker.get("timeout"), name="attacker.timeout", default=float(timeout)
+    )
+    if victim_timeout_default <= 0 or attacker_timeout_default <= 0:
+        raise SystemExit("victim/attacker.timeout must be > 0")
+
     victim_verify_tls = _as_bool(
         victim.get("verify_tls"), name="victim.verify_tls", default=verify_tls_effective
     )
@@ -535,6 +544,39 @@ def run_test(
             victim_body = ep.get("victim_body")
             attacker_body = ep.get("attacker_body", victim_body)
 
+            victim_timeout = victim_timeout_default
+            attacker_timeout = attacker_timeout_default
+
+            ep_timeout_raw = ep.get("timeout")
+            if ep_timeout_raw is not None:
+                ep_timeout = _as_float(
+                    ep_timeout_raw, name=f"endpoints[{total + 1}].timeout", default=float(timeout)
+                )
+                if ep_timeout <= 0:
+                    raise SystemExit(f"endpoints[{total + 1}].timeout must be > 0")
+                victim_timeout = ep_timeout
+                attacker_timeout = ep_timeout
+
+            victim_timeout_raw = ep.get("victim_timeout")
+            if victim_timeout_raw is not None:
+                victim_timeout = _as_float(
+                    victim_timeout_raw,
+                    name=f"endpoints[{total + 1}].victim_timeout",
+                    default=victim_timeout,
+                )
+                if victim_timeout <= 0:
+                    raise SystemExit(f"endpoints[{total + 1}].victim_timeout must be > 0")
+
+            attacker_timeout_raw = ep.get("attacker_timeout")
+            if attacker_timeout_raw is not None:
+                attacker_timeout = _as_float(
+                    attacker_timeout_raw,
+                    name=f"endpoints[{total + 1}].attacker_timeout",
+                    default=attacker_timeout,
+                )
+                if attacker_timeout <= 0:
+                    raise SystemExit(f"endpoints[{total + 1}].attacker_timeout must be > 0")
+
             ep_follow_redirects = _as_bool(
                 ep.get("follow_redirects"),
                 name=f"endpoints[{total + 1}].follow_redirects",
@@ -559,7 +601,7 @@ def run_test(
                 url,
                 headers=victim_headers,
                 json_body=victim_body,
-                timeout=timeout,
+                timeout=victim_timeout,
                 max_bytes=max_bytes,
                 verify_tls=victim_verify_tls,
                 proxy=victim_proxy,
@@ -574,7 +616,7 @@ def run_test(
                 url,
                 headers=attacker_headers,
                 json_body=attacker_body,
-                timeout=timeout,
+                timeout=attacker_timeout,
                 max_bytes=max_bytes,
                 verify_tls=attacker_verify_tls,
                 proxy=attacker_proxy,
