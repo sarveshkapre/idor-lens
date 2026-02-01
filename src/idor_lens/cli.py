@@ -8,6 +8,7 @@ from .compare import compare_jsonl, write_compare_output
 from .jsonl import open_text_out
 from .report import write_html_report
 from .runner import run_test
+from .summarize import summarize_jsonl, write_summary
 from .template import SpecTemplateOptions, render_spec_template
 from .validate import validate_spec
 
@@ -134,6 +135,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_validate.set_defaults(func=_validate)
 
+    p_summarize = sub.add_parser("summarize", help="Summarize a JSONL run output")
+    p_summarize.add_argument(
+        "--in", dest="in_path", required=True, help="Input JSONL path, or '-' for stdin"
+    )
+    p_summarize.add_argument(
+        "--out", dest="out_path", default="-", help="Output path (default: stdout)"
+    )
+    p_summarize.add_argument("--json", action="store_true", help="Write machine-readable JSON")
+    p_summarize.add_argument(
+        "--min-confidence",
+        default="medium",
+        choices=["none", "medium", "high"],
+        help="Treat vulnerabilities below this confidence as non-vulnerable",
+    )
+    p_summarize.set_defaults(func=_summarize)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -189,6 +206,12 @@ def _init(args: argparse.Namespace) -> int:
 
 def _validate(args: argparse.Namespace) -> int:
     return validate_spec(Path(args.spec), require_env=bool(args.require_env))
+
+
+def _summarize(args: argparse.Namespace) -> int:
+    summary = summarize_jsonl(Path(args.in_path), min_confidence=str(args.min_confidence))
+    write_summary(summary, Path(args.out_path), as_json=bool(args.json))
+    return 0
 
 
 if __name__ == "__main__":

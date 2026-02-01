@@ -42,6 +42,7 @@ python -m idor_lens --help
 - Retry/backoff controls for transient errors.
 - Per-role/per-endpoint timeout overrides.
 - `idor-lens validate` (fail fast on missing env vars).
+- `idor-lens summarize` (CI-friendly counts from JSONL).
 
 ## Next (tight scope)
 

@@ -8,6 +8,7 @@
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
 - `idor-lens init` writes a starter YAML spec.
 - `idor-lens validate` validates a spec and can fail on missing env vars.
+- `idor-lens summarize` summarizes JSONL output for CI/terminal use.
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).
 - `idor-lens run` supports `--proxy` and `--insecure`.

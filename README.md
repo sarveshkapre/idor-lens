@@ -83,6 +83,12 @@ Tips:
 python -m idor_lens report --in idor-report.jsonl --out idor-report.html
 ```
 
+## Summarize JSONL
+
+```bash
+python -m idor_lens summarize --in idor-report.jsonl
+```
+
 ## Regression compare
 
 Compare a baseline run to a new run and fail CI only when *new* vulnerabilities appear:

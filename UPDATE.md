@@ -14,6 +14,7 @@
 - Added `--retries`/`--retry-backoff` to stabilize scans against transient failures (timeouts, 429/502/503/504).
 - Added per-role/per-endpoint timeouts in the YAML spec for slow endpoints.
 - Added `idor-lens validate` to check specs and fail when env vars are missing.
+- Added `idor-lens summarize` to quickly extract counts from JSONL outputs.
 
 ## How to run
 
