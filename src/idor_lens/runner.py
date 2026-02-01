@@ -159,6 +159,7 @@ def _request_with_proof(
     max_bytes: int,
     verify_tls: bool,
     proxy: str | None,
+    follow_redirects: bool,
 ) -> _Proof:
     start = time.time()
     proxies = _proxies(proxy)
@@ -171,6 +172,7 @@ def _request_with_proof(
             timeout=timeout,
             verify=verify_tls,
             proxies=proxies,
+            allow_redirects=follow_redirects,
         )
     except requests.RequestException as exc:
         elapsed_ms = int((time.time() - start) * 1000)
@@ -220,6 +222,7 @@ def _run_preflight(
     max_bytes: int,
     verify_tls: bool,
     proxy: str | None,
+    follow_redirects: bool,
 ) -> None:
     if preflight is None:
         return
@@ -257,6 +260,7 @@ def _run_preflight(
             max_bytes=max_bytes,
             verify_tls=verify_tls,
             proxy=proxy,
+            follow_redirects=follow_redirects,
         )
         if proof.error:
             raise SystemExit(
@@ -274,6 +278,7 @@ def run_test(
     max_bytes: int = _DEFAULT_MAX_BYTES,
     verify_tls: bool | None = None,
     proxy: str | None = None,
+    follow_redirects: bool | None = None,
 ) -> int:
     spec = _load_spec(spec_path)
     base_url = spec.get("base_url")
@@ -302,6 +307,13 @@ def run_test(
 
     spec_proxy = _as_optional_str(spec.get("proxy"), name="proxy")
 
+    spec_follow_redirects = _as_bool(
+        spec.get("follow_redirects"), name="follow_redirects", default=False
+    )
+    follow_redirects_effective = (
+        spec_follow_redirects if follow_redirects is None else follow_redirects
+    )
+
     victim_token = victim.get("auth")
     attacker_token = attacker.get("auth")
     if victim_token is not None and not isinstance(victim_token, str):
@@ -325,6 +337,17 @@ def run_test(
         attacker.get("verify_tls"), name="attacker.verify_tls", default=verify_tls_effective
     )
 
+    victim_follow_redirects = _as_bool(
+        victim.get("follow_redirects"),
+        name="victim.follow_redirects",
+        default=follow_redirects_effective,
+    )
+    attacker_follow_redirects = _as_bool(
+        attacker.get("follow_redirects"),
+        name="attacker.follow_redirects",
+        default=follow_redirects_effective,
+    )
+
     victim_proxy = _as_optional_str(victim.get("proxy"), name="victim.proxy") or spec_proxy
     attacker_proxy = _as_optional_str(attacker.get("proxy"), name="attacker.proxy") or spec_proxy
     if proxy is not None:
@@ -345,6 +368,7 @@ def run_test(
         max_bytes=max_bytes,
         verify_tls=victim_verify_tls,
         proxy=victim_proxy,
+        follow_redirects=victim_follow_redirects,
     )
     _run_preflight(
         attacker_session,
@@ -356,6 +380,7 @@ def run_test(
         max_bytes=max_bytes,
         verify_tls=attacker_verify_tls,
         proxy=attacker_proxy,
+        follow_redirects=attacker_follow_redirects,
     )
 
     is_stdout = str(out_path) == "-"
@@ -395,6 +420,22 @@ def run_test(
             victim_body = ep.get("victim_body")
             attacker_body = ep.get("attacker_body", victim_body)
 
+            ep_follow_redirects = _as_bool(
+                ep.get("follow_redirects"),
+                name=f"endpoints[{total + 1}].follow_redirects",
+                default=follow_redirects_effective,
+            )
+            victim_ep_follow_redirects = _as_bool(
+                ep.get("victim_follow_redirects"),
+                name=f"endpoints[{total + 1}].victim_follow_redirects",
+                default=ep_follow_redirects,
+            )
+            attacker_ep_follow_redirects = _as_bool(
+                ep.get("attacker_follow_redirects"),
+                name=f"endpoints[{total + 1}].attacker_follow_redirects",
+                default=ep_follow_redirects,
+            )
+
             url = urljoin(base_url, path)
             start_total = time.time()
             v = _request_with_proof(
@@ -407,6 +448,7 @@ def run_test(
                 max_bytes=max_bytes,
                 verify_tls=victim_verify_tls,
                 proxy=victim_proxy,
+                follow_redirects=victim_ep_follow_redirects,
             )
             a = _request_with_proof(
                 attacker_session.request,
@@ -418,6 +460,7 @@ def run_test(
                 max_bytes=max_bytes,
                 verify_tls=attacker_verify_tls,
                 proxy=attacker_proxy,
+                follow_redirects=attacker_ep_follow_redirects,
             )
             elapsed = int((time.time() - start_total) * 1000)
 

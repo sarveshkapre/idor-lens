@@ -10,6 +10,7 @@
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).
 - `idor-lens run` supports `--proxy` and `--insecure`.
+- `idor-lens run` supports `--follow-redirects` / `--no-follow-redirects`.
 
 ### Changed
 

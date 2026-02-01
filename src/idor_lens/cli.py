@@ -50,6 +50,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Disable TLS certificate verification (useful for local/self-signed targets)",
     )
+    g_redirects = p_run.add_mutually_exclusive_group()
+    g_redirects.add_argument(
+        "--follow-redirects",
+        action="store_true",
+        help="Follow HTTP redirects (default: disabled to reduce false positives)",
+    )
+    g_redirects.add_argument(
+        "--no-follow-redirects",
+        action="store_true",
+        help="Do not follow HTTP redirects",
+    )
     p_run.set_defaults(func=_run)
 
     p_report = sub.add_parser("report", help="Render an HTML report from a JSONL run output")
@@ -115,6 +126,13 @@ def _run(args: argparse.Namespace) -> int:
         max_bytes=int(args.max_bytes),
         verify_tls=(False if bool(args.insecure) else None),
         proxy=(str(args.proxy) if args.proxy is not None else None),
+        follow_redirects=(
+            True
+            if bool(args.follow_redirects)
+            else False
+            if bool(args.no_follow_redirects)
+            else None
+        ),
     )
 
 

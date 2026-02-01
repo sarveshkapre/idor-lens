@@ -190,3 +190,27 @@ def test_proxy_and_tls_flags_are_passed(tmp_path: Path, monkeypatch: MonkeyPatch
         k.get("proxies") == {"http": "http://127.0.0.1:8080", "https": "http://127.0.0.1:8080"}
         for k in seen
     )
+
+
+def test_follow_redirects_flag_is_passed(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        seen.append(kwargs)
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, follow_redirects=True)
+
+    assert seen
+    assert all(k.get("allow_redirects") is True for k in seen)
