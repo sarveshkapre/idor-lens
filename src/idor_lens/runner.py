@@ -16,6 +16,14 @@ import yaml
 _DEFAULT_MAX_BYTES = 1024 * 1024
 
 
+def _merge_headers(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
+    if not extra:
+        return dict(base)
+    merged = dict(base)
+    merged.update(extra)
+    return merged
+
+
 @dataclass(frozen=True)
 class Finding:
     endpoint: str
@@ -102,6 +110,7 @@ class _Proof:
 
 
 def _request_with_proof(
+    request_fn: Any,
     method: str,
     url: str,
     *,
@@ -112,7 +121,7 @@ def _request_with_proof(
 ) -> _Proof:
     start = time.time()
     try:
-        resp = requests.request(method, url, headers=headers, json=json_body, timeout=timeout)
+        resp = request_fn(method, url, headers=headers, json=json_body, timeout=timeout)
     except requests.RequestException as exc:
         elapsed_ms = int((time.time() - start) * 1000)
         return _Proof(
@@ -141,6 +150,64 @@ def _request_with_proof(
         truncated=truncated,
         error=None,
     )
+
+
+def _apply_cookies(session: requests.Session, cookies: dict[str, str], *, name: str) -> None:
+    for k, v in cookies.items():
+        if not k:
+            raise SystemExit(f"{name}.cookies keys must be non-empty strings")
+        session.cookies.set(k, v)
+
+
+def _run_preflight(
+    session: requests.Session,
+    *,
+    name: str,
+    base_url: str,
+    base_headers: dict[str, str],
+    preflight: Any,
+    timeout: float,
+    max_bytes: int,
+) -> None:
+    if preflight is None:
+        return
+    if not isinstance(preflight, list):
+        raise SystemExit(f"{name}.preflight must be a list")
+
+    for idx, step in enumerate(preflight, start=1):
+        if not isinstance(step, dict):
+            raise SystemExit(f"{name}.preflight[{idx}] must be a mapping")
+        path = step.get("path")
+        if not isinstance(path, str) or not path:
+            raise SystemExit(f"{name}.preflight[{idx}].path must be a non-empty string")
+        method = step.get("method", "GET")
+        if not isinstance(method, str) or not method:
+            raise SystemExit(f"{name}.preflight[{idx}].method must be a non-empty string")
+
+        step_timeout = step.get("timeout", timeout)
+        if not isinstance(step_timeout, (int, float)):
+            raise SystemExit(f"{name}.preflight[{idx}].timeout must be a number")
+
+        step_headers = _merge_headers(
+            base_headers,
+            _as_str_dict(step.get("headers"), name=f"{name}.preflight[{idx}].headers"),
+        )
+        body = step.get("body")
+        url = urljoin(base_url, path)
+
+        proof = _request_with_proof(
+            session.request,
+            method.upper(),
+            url,
+            headers=step_headers,
+            json_body=body,
+            timeout=float(step_timeout),
+            max_bytes=max_bytes,
+        )
+        if proof.error:
+            raise SystemExit(
+                f"{name} preflight step {idx} failed ({method.upper()} {path}): {proof.error}"
+            )
 
 
 def run_test(
@@ -174,6 +241,45 @@ def run_test(
     if max_bytes <= 0:
         raise SystemExit("--max-bytes must be > 0")
 
+    victim_token = victim.get("auth")
+    attacker_token = attacker.get("auth")
+    if victim_token is not None and not isinstance(victim_token, str):
+        raise SystemExit("victim.auth must be a string")
+    if attacker_token is not None and not isinstance(attacker_token, str):
+        raise SystemExit("attacker.auth must be a string")
+
+    victim_headers_base = _headers(
+        victim_token, _as_str_dict(victim.get("headers"), name="victim.headers")
+    )
+    attacker_headers_base = _headers(
+        attacker_token, _as_str_dict(attacker.get("headers"), name="attacker.headers")
+    )
+    victim_cookies = _as_str_dict(victim.get("cookies"), name="victim.cookies")
+    attacker_cookies = _as_str_dict(attacker.get("cookies"), name="attacker.cookies")
+
+    victim_session = requests.Session()
+    attacker_session = requests.Session()
+    _apply_cookies(victim_session, victim_cookies, name="victim")
+    _apply_cookies(attacker_session, attacker_cookies, name="attacker")
+    _run_preflight(
+        victim_session,
+        name="victim",
+        base_url=base_url,
+        base_headers=victim_headers_base,
+        preflight=victim.get("preflight"),
+        timeout=timeout,
+        max_bytes=max_bytes,
+    )
+    _run_preflight(
+        attacker_session,
+        name="attacker",
+        base_url=base_url,
+        base_headers=attacker_headers_base,
+        preflight=attacker.get("preflight"),
+        timeout=timeout,
+        max_bytes=max_bytes,
+    )
+
     is_stdout = str(out_path) == "-"
     if not is_stdout:
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -195,18 +301,18 @@ def run_test(
                 raise SystemExit("endpoint method must be a string")
             method = method.upper()
 
-            victim_token = victim.get("auth")
-            attacker_token = attacker.get("auth")
-            if victim_token is not None and not isinstance(victim_token, str):
-                raise SystemExit("victim.auth must be a string")
-            if attacker_token is not None and not isinstance(attacker_token, str):
-                raise SystemExit("attacker.auth must be a string")
-
-            victim_headers = _headers(
-                victim_token, _as_str_dict(victim.get("headers"), name="victim.headers")
+            common_headers = _as_str_dict(ep.get("headers"), name=f"endpoints[{total + 1}].headers")
+            victim_headers = _merge_headers(
+                _merge_headers(victim_headers_base, common_headers),
+                _as_str_dict(
+                    ep.get("victim_headers"), name=f"endpoints[{total + 1}].victim_headers"
+                ),
             )
-            attacker_headers = _headers(
-                attacker_token, _as_str_dict(attacker.get("headers"), name="attacker.headers")
+            attacker_headers = _merge_headers(
+                _merge_headers(attacker_headers_base, common_headers),
+                _as_str_dict(
+                    ep.get("attacker_headers"), name=f"endpoints[{total + 1}].attacker_headers"
+                ),
             )
             victim_body = ep.get("victim_body")
             attacker_body = ep.get("attacker_body", victim_body)
@@ -214,6 +320,7 @@ def run_test(
             url = urljoin(base_url, path)
             start_total = time.time()
             v = _request_with_proof(
+                victim_session.request,
                 method,
                 url,
                 headers=victim_headers,
@@ -222,6 +329,7 @@ def run_test(
                 max_bytes=max_bytes,
             )
             a = _request_with_proof(
+                attacker_session.request,
                 method,
                 url,
                 headers=attacker_headers,

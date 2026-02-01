@@ -21,6 +21,33 @@ make check
 python -m idor_lens run --spec spec.yml --out idor-report.jsonl
 ```
 
+### Auth realism (cookies + preflight)
+
+Many apps need cookies/CSRF/bootstrap requests before protected endpoints behave realistically.
+
+Add optional `cookies` and `preflight` under `victim`/`attacker` in your spec:
+
+```yaml
+base_url: https://example.test
+victim:
+  auth: Bearer victim
+  cookies:
+    session: victim_session_cookie
+  preflight:
+    - path: /bootstrap
+      method: GET
+attacker:
+  auth: Bearer attacker
+  cookies:
+    session: attacker_session_cookie
+  preflight:
+    - path: /bootstrap
+      method: GET
+endpoints:
+  - path: /items/123
+    method: GET
+```
+
 Tips:
 
 - Use `--out -` to stream JSONL to stdout.

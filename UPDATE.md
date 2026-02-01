@@ -5,6 +5,7 @@
 - Improved `idor-lens run` with richer JSONL proof, stdout output, and CI/regression flags.
 - Added `idor-lens report` to render a standalone HTML report.
 - Added `idor-lens compare` to fail CI only on *new* vulnerabilities vs a baseline.
+- Added spec support for cookies + preflight requests for more realistic auth flows.
 
 ## How to run
 

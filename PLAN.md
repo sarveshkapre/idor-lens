@@ -36,6 +36,7 @@ python -m idor_lens --help
 - CI/regression knobs: `--fail-on-vuln` + `--strict-body-match`.
 - `idor-lens report` HTML renderer for clean triage.
 - `idor-lens compare` baseline vs current regression mode (new vulns only).
+- Cookie + preflight support for more realistic auth flows.
 
 ## Next (tight scope)
 
