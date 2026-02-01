@@ -11,6 +11,7 @@
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).
 - `idor-lens run` supports `--proxy` and `--insecure`.
 - `idor-lens run` supports `--follow-redirects` / `--no-follow-redirects`.
+- `idor-lens run` supports `--retries` / `--retry-backoff` for transient errors.
 
 ### Changed
 

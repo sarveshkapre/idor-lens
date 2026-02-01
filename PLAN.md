@@ -39,6 +39,7 @@ python -m idor_lens --help
 - Cookie + preflight support for more realistic auth flows.
 - Env var expansion in spec strings (avoid hardcoding secrets).
 - `idor-lens init` to generate a starter `spec.yml`.
+- Retry/backoff controls for transient errors.
 
 ## Next (tight scope)
 

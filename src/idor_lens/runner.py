@@ -15,6 +15,7 @@ import yaml
 
 
 _DEFAULT_MAX_BYTES = 1024 * 1024
+_DEFAULT_RETRY_STATUSES = {429, 502, 503, 504}
 
 
 def _merge_headers(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
@@ -34,6 +35,8 @@ class Finding:
     attacker_status: int
     victim_elapsed_ms: int
     attacker_elapsed_ms: int
+    victim_attempts: int
+    attacker_attempts: int
     vulnerable: bool
     confidence: str
     body_match: bool
@@ -57,6 +60,8 @@ class Finding:
             "attacker_status": self.attacker_status,
             "victim_elapsed_ms": self.victim_elapsed_ms,
             "attacker_elapsed_ms": self.attacker_elapsed_ms,
+            "victim_attempts": self.victim_attempts,
+            "attacker_attempts": self.attacker_attempts,
             "vulnerable": self.vulnerable,
             "confidence": self.confidence,
             "body_match": self.body_match,
@@ -121,6 +126,35 @@ def _as_bool(value: Any, *, name: str, default: bool) -> bool:
     raise SystemExit(f"{name} must be a boolean")
 
 
+def _as_int(value: Any, *, name: str, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, int):
+        return value
+    raise SystemExit(f"{name} must be an integer")
+
+
+def _as_float(value: Any, *, name: str, default: float) -> float:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    raise SystemExit(f"{name} must be a number")
+
+
+def _as_int_set(value: Any, *, name: str, default: set[int]) -> set[int]:
+    if value is None:
+        return set(default)
+    if not isinstance(value, list):
+        raise SystemExit(f"{name} must be a list of integers")
+    out: set[int] = set()
+    for v in value:
+        if not isinstance(v, int):
+            raise SystemExit(f"{name} must be a list of integers")
+        out.add(v)
+    return out
+
+
 def _as_optional_str(value: Any, *, name: str) -> str | None:
     if value is None:
         return None
@@ -146,6 +180,7 @@ class _Proof:
     sha256: str | None
     truncated: bool
     error: str | None
+    attempts: int
 
 
 def _request_with_proof(
@@ -160,47 +195,69 @@ def _request_with_proof(
     verify_tls: bool,
     proxy: str | None,
     follow_redirects: bool,
+    retries: int,
+    retry_backoff_s: float,
+    retry_statuses: set[int],
 ) -> _Proof:
     start = time.time()
     proxies = _proxies(proxy)
-    try:
-        resp = request_fn(
-            method,
-            url,
-            headers=headers,
-            json=json_body,
-            timeout=timeout,
-            verify=verify_tls,
-            proxies=proxies,
-            allow_redirects=follow_redirects,
-        )
-    except requests.RequestException as exc:
-        elapsed_ms = int((time.time() - start) * 1000)
-        return _Proof(
-            status=0,
-            elapsed_ms=elapsed_ms,
-            num_bytes=0,
-            sha256=None,
-            truncated=False,
-            error=str(exc),
-        )
+
+    last_error: str | None = None
+    last_status = 0
+    last_body: bytes = b""
+    attempts_used = 0
+
+    max_attempts = retries + 1
+    for attempt in range(1, max_attempts + 1):
+        attempts_used = attempt
+        try:
+            resp = request_fn(
+                method,
+                url,
+                headers=headers,
+                json=json_body,
+                timeout=timeout,
+                verify=verify_tls,
+                proxies=proxies,
+                allow_redirects=follow_redirects,
+            )
+            last_status = int(getattr(resp, "status_code", 0))
+            body = getattr(resp, "content", b"") or b""
+            if not isinstance(body, (bytes, bytearray)):
+                body = str(body).encode("utf-8", errors="replace")
+            last_body = bytes(body)
+            last_error = None
+
+            should_retry = attempt < max_attempts and last_status in retry_statuses
+            if should_retry:
+                if retry_backoff_s > 0:
+                    time.sleep(retry_backoff_s * (2 ** (attempt - 1)))
+                continue
+            break
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            last_error = str(exc)
+            if attempt < max_attempts:
+                if retry_backoff_s > 0:
+                    time.sleep(retry_backoff_s * (2 ** (attempt - 1)))
+                continue
+            break
+        except requests.RequestException as exc:
+            last_error = str(exc)
+            break
 
     elapsed_ms = int((time.time() - start) * 1000)
-    body = getattr(resp, "content", b"") or b""
-    if not isinstance(body, (bytes, bytearray)):
-        body = str(body).encode("utf-8", errors="replace")
-
-    num_bytes = len(body)
+    num_bytes = len(last_body)
     truncated = num_bytes > max_bytes
-    digest = hashlib.sha256(body[:max_bytes]).hexdigest() if num_bytes else None
+    digest = hashlib.sha256(last_body[:max_bytes]).hexdigest() if num_bytes else None
 
     return _Proof(
-        status=int(getattr(resp, "status_code", 0)),
+        status=last_status,
         elapsed_ms=elapsed_ms,
         num_bytes=num_bytes,
         sha256=digest,
         truncated=truncated,
-        error=None,
+        error=last_error,
+        attempts=attempts_used,
     )
 
 
@@ -223,6 +280,9 @@ def _run_preflight(
     verify_tls: bool,
     proxy: str | None,
     follow_redirects: bool,
+    retries: int,
+    retry_backoff_s: float,
+    retry_statuses: set[int],
 ) -> None:
     if preflight is None:
         return
@@ -261,6 +321,9 @@ def _run_preflight(
             verify_tls=verify_tls,
             proxy=proxy,
             follow_redirects=follow_redirects,
+            retries=retries,
+            retry_backoff_s=retry_backoff_s,
+            retry_statuses=retry_statuses,
         )
         if proof.error:
             raise SystemExit(
@@ -279,6 +342,8 @@ def run_test(
     verify_tls: bool | None = None,
     proxy: str | None = None,
     follow_redirects: bool | None = None,
+    retries: int | None = None,
+    retry_backoff_s: float | None = None,
 ) -> int:
     spec = _load_spec(spec_path)
     base_url = spec.get("base_url")
@@ -312,6 +377,28 @@ def run_test(
     )
     follow_redirects_effective = (
         spec_follow_redirects if follow_redirects is None else follow_redirects
+    )
+
+    spec_retries = _as_int(spec.get("retries"), name="retries", default=0)
+    if spec_retries < 0:
+        raise SystemExit("retries must be >= 0")
+    retries_effective = spec_retries if retries is None else retries
+    if retries_effective < 0:
+        raise SystemExit("--retries must be >= 0")
+
+    spec_retry_backoff_s = _as_float(
+        spec.get("retry_backoff_s"), name="retry_backoff_s", default=0.25
+    )
+    if spec_retry_backoff_s < 0:
+        raise SystemExit("retry_backoff_s must be >= 0")
+    retry_backoff_s_effective = spec_retry_backoff_s if retry_backoff_s is None else retry_backoff_s
+    if retry_backoff_s_effective < 0:
+        raise SystemExit("--retry-backoff must be >= 0")
+
+    retry_statuses = _as_int_set(
+        spec.get("retry_statuses"),
+        name="retry_statuses",
+        default=_DEFAULT_RETRY_STATUSES,
     )
 
     victim_token = victim.get("auth")
@@ -348,6 +435,28 @@ def run_test(
         default=follow_redirects_effective,
     )
 
+    victim_retries = _as_int(
+        victim.get("retries"), name="victim.retries", default=retries_effective
+    )
+    attacker_retries = _as_int(
+        attacker.get("retries"), name="attacker.retries", default=retries_effective
+    )
+    if victim_retries < 0 or attacker_retries < 0:
+        raise SystemExit("victim/attacker.retries must be >= 0")
+
+    victim_retry_backoff_s = _as_float(
+        victim.get("retry_backoff_s"),
+        name="victim.retry_backoff_s",
+        default=retry_backoff_s_effective,
+    )
+    attacker_retry_backoff_s = _as_float(
+        attacker.get("retry_backoff_s"),
+        name="attacker.retry_backoff_s",
+        default=retry_backoff_s_effective,
+    )
+    if victim_retry_backoff_s < 0 or attacker_retry_backoff_s < 0:
+        raise SystemExit("victim/attacker.retry_backoff_s must be >= 0")
+
     victim_proxy = _as_optional_str(victim.get("proxy"), name="victim.proxy") or spec_proxy
     attacker_proxy = _as_optional_str(attacker.get("proxy"), name="attacker.proxy") or spec_proxy
     if proxy is not None:
@@ -369,6 +478,9 @@ def run_test(
         verify_tls=victim_verify_tls,
         proxy=victim_proxy,
         follow_redirects=victim_follow_redirects,
+        retries=victim_retries,
+        retry_backoff_s=victim_retry_backoff_s,
+        retry_statuses=retry_statuses,
     )
     _run_preflight(
         attacker_session,
@@ -381,6 +493,9 @@ def run_test(
         verify_tls=attacker_verify_tls,
         proxy=attacker_proxy,
         follow_redirects=attacker_follow_redirects,
+        retries=attacker_retries,
+        retry_backoff_s=attacker_retry_backoff_s,
+        retry_statuses=retry_statuses,
     )
 
     is_stdout = str(out_path) == "-"
@@ -449,6 +564,9 @@ def run_test(
                 verify_tls=victim_verify_tls,
                 proxy=victim_proxy,
                 follow_redirects=victim_ep_follow_redirects,
+                retries=victim_retries,
+                retry_backoff_s=victim_retry_backoff_s,
+                retry_statuses=retry_statuses,
             )
             a = _request_with_proof(
                 attacker_session.request,
@@ -461,6 +579,9 @@ def run_test(
                 verify_tls=attacker_verify_tls,
                 proxy=attacker_proxy,
                 follow_redirects=attacker_ep_follow_redirects,
+                retries=attacker_retries,
+                retry_backoff_s=attacker_retry_backoff_s,
+                retry_statuses=retry_statuses,
             )
             elapsed = int((time.time() - start_total) * 1000)
 
@@ -509,6 +630,8 @@ def run_test(
                 attacker_status=a.status,
                 victim_elapsed_ms=v.elapsed_ms,
                 attacker_elapsed_ms=a.elapsed_ms,
+                victim_attempts=v.attempts,
+                attacker_attempts=a.attempts,
                 vulnerable=vulnerable,
                 confidence=confidence,
                 body_match=body_match,

@@ -22,6 +22,10 @@ verify_tls: true
 # Optional: route requests via Burp/mitmproxy.
 # proxy: http://127.0.0.1:8080
 
+# Optional: retries for transient errors (default: 0).
+# retries: 0
+# retry_backoff_s: 0.25
+
 victim:
   # Typical header-based auth:
   auth: Bearer ${{VICTIM_TOKEN}}

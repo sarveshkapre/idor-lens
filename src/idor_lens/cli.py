@@ -43,6 +43,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit non-zero if any vulnerabilities are found (CI/regression mode)",
     )
     p_run.add_argument(
+        "--retries",
+        type=int,
+        default=0,
+        help="Retry count for transient errors and 429/502/503/504 (default: 0)",
+    )
+    p_run.add_argument(
+        "--retry-backoff",
+        type=float,
+        default=0.25,
+        help="Seconds for exponential backoff base between retries (default: 0.25)",
+    )
+    p_run.add_argument(
         "--proxy", help="Proxy URL for both victim and attacker (e.g. http://127.0.0.1:8080)"
     )
     p_run.add_argument(
@@ -133,6 +145,8 @@ def _run(args: argparse.Namespace) -> int:
             if bool(args.no_follow_redirects)
             else None
         ),
+        retries=int(args.retries),
+        retry_backoff_s=float(args.retry_backoff),
     )
 
 

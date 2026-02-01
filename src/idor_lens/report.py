@@ -23,6 +23,8 @@ class ReportRow:
     elapsed_ms: int
     victim_elapsed_ms: int | None
     attacker_elapsed_ms: int | None
+    victim_attempts: int | None
+    attacker_attempts: int | None
     victim_bytes: int | None
     attacker_bytes: int | None
     victim_sha256: str | None
@@ -74,6 +76,12 @@ def _to_report_row(d: dict[str, Any]) -> ReportRow:
         else None,
         attacker_elapsed_ms=d.get("attacker_elapsed_ms")
         if isinstance(d.get("attacker_elapsed_ms"), int)
+        else None,
+        victim_attempts=d.get("victim_attempts")
+        if isinstance(d.get("victim_attempts"), int)
+        else None,
+        attacker_attempts=d.get("attacker_attempts")
+        if isinstance(d.get("attacker_attempts"), int)
         else None,
         victim_bytes=d.get("victim_bytes") if isinstance(d.get("victim_bytes"), int) else None,
         attacker_bytes=d.get("attacker_bytes")
@@ -145,6 +153,14 @@ def _render_html(
         if r.attacker_elapsed_ms is not None:
             details_bits.append(
                 f"<div><span class='k'>Attacker elapsed</span> {r.attacker_elapsed_ms} ms</div>"
+            )
+        if r.victim_attempts is not None and r.victim_attempts > 1:
+            details_bits.append(
+                f"<div><span class='k'>Victim attempts</span> {r.victim_attempts}</div>"
+            )
+        if r.attacker_attempts is not None and r.attacker_attempts > 1:
+            details_bits.append(
+                f"<div><span class='k'>Attacker attempts</span> {r.attacker_attempts}</div>"
             )
         if r.victim_bytes is not None:
             details_bits.append(f"<div><span class='k'>Victim bytes</span> {r.victim_bytes}</div>")

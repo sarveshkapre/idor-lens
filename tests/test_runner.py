@@ -214,3 +214,63 @@ def test_follow_redirects_flag_is_passed(tmp_path: Path, monkeypatch: MonkeyPatc
 
     assert seen
     assert all(k.get("allow_redirects") is True for k in seen)
+
+
+def test_retries_on_retryable_status(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    counts: dict[str, int] = {"victim": 0, "attacker": 0}
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        key = "victim" if auth == "Bearer victim" else "attacker"
+        counts[key] += 1
+        if counts[key] == 1:
+            return _Resp(503, b"try again")
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, retries=1, retry_backoff_s=0.0)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["victim_attempts"] == 2
+    assert data["attacker_attempts"] == 2
+    assert data["victim_status"] == 200
+    assert data["attacker_status"] == 200
+
+
+def test_retries_on_timeout(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    counts: dict[str, int] = {"victim": 0, "attacker": 0}
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        key = "victim" if auth == "Bearer victim" else "attacker"
+        counts[key] += 1
+        if counts[key] == 1:
+            raise requests.Timeout("timeout")
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, retries=1, retry_backoff_s=0.0)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["victim_attempts"] == 2
+    assert data["attacker_attempts"] == 2

@@ -63,6 +63,7 @@ Tips:
 - Use `--proxy http://127.0.0.1:8080` to route both roles through Burp/mitmproxy.
 - Use `--insecure` for self-signed TLS (e.g. local dev).
 - By default redirects are not followed; use `--follow-redirects` if needed.
+- For flaky targets, use `--retries 2 --retry-backoff 0.25` (retries 429/502/503/504 + timeouts).
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
 - Use `--strict-body-match` to reduce false positives when attacker gets a different 2xx body.

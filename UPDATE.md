@@ -11,6 +11,7 @@
 - Added `--proxy` and `--insecure` for better local testing (Burp/self-signed TLS).
 - Added `idor-lens init` to generate a starter `spec.yml`.
 - Added `--follow-redirects`/`--no-follow-redirects` (default: do not follow redirects).
+- Added `--retries`/`--retry-backoff` to stabilize scans against transient failures (timeouts, 429/502/503/504).
 
 ## How to run
 
