@@ -7,6 +7,7 @@
 - Added `idor-lens compare` to fail CI only on *new* vulnerabilities vs a baseline.
 - Added spec support for cookies + preflight requests for more realistic auth flows.
 - Added env var expansion in spec strings (`$VAR` / `${VAR}`) to avoid hardcoding secrets.
+- When using `--out -`, the run summary is printed to stderr to keep stdout as pure JSONL.
 
 ## How to run
 

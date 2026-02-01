@@ -13,6 +13,7 @@
 
 - JSONL findings now include more proof fields (URL, timing, bytes + sha256, truncation, request errors).
 - `idor-lens run` supports `--out -`, `--fail-on-vuln`, and `--strict-body-match`.
+- When using `--out -`, status output is written to stderr to keep stdout as pure JSONL.
 
 ## v0.1.0 - 2026-01-31
 

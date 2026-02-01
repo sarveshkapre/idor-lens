@@ -418,5 +418,5 @@ def run_test(
             out_handle.close()
 
     out_label = "stdout" if is_stdout else str(out_path)
-    print(f"wrote {out_label} ({found_vulns}/{total} vulnerable)")
+    print(f"wrote {out_label} ({found_vulns}/{total} vulnerable)", file=sys.stderr)
     return 2 if (fail_on_vuln and found_vulns) else 0

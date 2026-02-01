@@ -6,6 +6,7 @@ from typing import Any
 
 import requests
 from _pytest.monkeypatch import MonkeyPatch
+from pytest import CaptureFixture
 
 from idor_lens.runner import run_test
 
@@ -130,3 +131,34 @@ def test_env_var_expansion_in_spec(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
 
     assert "Bearer victim-token" in seen_auth
     assert "Bearer attacker-token" in seen_auth
+
+
+def test_stdout_output_is_jsonl_only(
+    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+) -> None:
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        if auth == "Bearer victim":
+            return _Resp(200, b'{"id":123,"owner":"victim"}')
+        return _Resp(403, b"denied")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+
+    rc = run_test(spec, Path("-"), timeout=1.0)
+    assert rc == 0
+
+    captured = capsys.readouterr()
+    assert "wrote" not in captured.out
+    assert captured.out.count("\n") >= 1
+    row = json.loads(captured.out.strip().splitlines()[0])
+    assert row["endpoint"] == "/items/123"
+    assert "wrote" in captured.err
