@@ -8,6 +8,7 @@
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).
+- `idor-lens run` supports `--proxy` and `--insecure`.
 
 ### Changed
 

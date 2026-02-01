@@ -113,6 +113,31 @@ def _headers(token: str | None, extra: dict[str, str]) -> dict[str, str]:
     return headers
 
 
+def _as_bool(value: Any, *, name: str, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raise SystemExit(f"{name} must be a boolean")
+
+
+def _as_optional_str(value: Any, *, name: str) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    raise SystemExit(f"{name} must be a string")
+
+
+def _proxies(proxy: str | None) -> dict[str, str] | None:
+    if proxy is None:
+        return None
+    p = proxy.strip()
+    if not p:
+        return None
+    return {"http": p, "https": p}
+
+
 @dataclass(frozen=True)
 class _Proof:
     status: int
@@ -132,10 +157,21 @@ def _request_with_proof(
     json_body: Any,
     timeout: float,
     max_bytes: int,
+    verify_tls: bool,
+    proxy: str | None,
 ) -> _Proof:
     start = time.time()
+    proxies = _proxies(proxy)
     try:
-        resp = request_fn(method, url, headers=headers, json=json_body, timeout=timeout)
+        resp = request_fn(
+            method,
+            url,
+            headers=headers,
+            json=json_body,
+            timeout=timeout,
+            verify=verify_tls,
+            proxies=proxies,
+        )
     except requests.RequestException as exc:
         elapsed_ms = int((time.time() - start) * 1000)
         return _Proof(
@@ -182,6 +218,8 @@ def _run_preflight(
     preflight: Any,
     timeout: float,
     max_bytes: int,
+    verify_tls: bool,
+    proxy: str | None,
 ) -> None:
     if preflight is None:
         return
@@ -217,6 +255,8 @@ def _run_preflight(
             json_body=body,
             timeout=float(step_timeout),
             max_bytes=max_bytes,
+            verify_tls=verify_tls,
+            proxy=proxy,
         )
         if proof.error:
             raise SystemExit(
@@ -232,6 +272,8 @@ def run_test(
     strict_body_match: bool = False,
     fail_on_vuln: bool = False,
     max_bytes: int = _DEFAULT_MAX_BYTES,
+    verify_tls: bool | None = None,
+    proxy: str | None = None,
 ) -> int:
     spec = _load_spec(spec_path)
     base_url = spec.get("base_url")
@@ -255,6 +297,11 @@ def run_test(
     if max_bytes <= 0:
         raise SystemExit("--max-bytes must be > 0")
 
+    spec_verify_tls = _as_bool(spec.get("verify_tls"), name="verify_tls", default=True)
+    verify_tls_effective = spec_verify_tls if verify_tls is None else verify_tls
+
+    spec_proxy = _as_optional_str(spec.get("proxy"), name="proxy")
+
     victim_token = victim.get("auth")
     attacker_token = attacker.get("auth")
     if victim_token is not None and not isinstance(victim_token, str):
@@ -271,6 +318,19 @@ def run_test(
     victim_cookies = _as_str_dict(victim.get("cookies"), name="victim.cookies")
     attacker_cookies = _as_str_dict(attacker.get("cookies"), name="attacker.cookies")
 
+    victim_verify_tls = _as_bool(
+        victim.get("verify_tls"), name="victim.verify_tls", default=verify_tls_effective
+    )
+    attacker_verify_tls = _as_bool(
+        attacker.get("verify_tls"), name="attacker.verify_tls", default=verify_tls_effective
+    )
+
+    victim_proxy = _as_optional_str(victim.get("proxy"), name="victim.proxy") or spec_proxy
+    attacker_proxy = _as_optional_str(attacker.get("proxy"), name="attacker.proxy") or spec_proxy
+    if proxy is not None:
+        victim_proxy = proxy
+        attacker_proxy = proxy
+
     victim_session = requests.Session()
     attacker_session = requests.Session()
     _apply_cookies(victim_session, victim_cookies, name="victim")
@@ -283,6 +343,8 @@ def run_test(
         preflight=victim.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
+        verify_tls=victim_verify_tls,
+        proxy=victim_proxy,
     )
     _run_preflight(
         attacker_session,
@@ -292,6 +354,8 @@ def run_test(
         preflight=attacker.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
+        verify_tls=attacker_verify_tls,
+        proxy=attacker_proxy,
     )
 
     is_stdout = str(out_path) == "-"
@@ -341,6 +405,8 @@ def run_test(
                 json_body=victim_body,
                 timeout=timeout,
                 max_bytes=max_bytes,
+                verify_tls=victim_verify_tls,
+                proxy=victim_proxy,
             )
             a = _request_with_proof(
                 attacker_session.request,
@@ -350,6 +416,8 @@ def run_test(
                 json_body=attacker_body,
                 timeout=timeout,
                 max_bytes=max_bytes,
+                verify_tls=attacker_verify_tls,
+                proxy=attacker_proxy,
             )
             elapsed = int((time.time() - start_total) * 1000)
 

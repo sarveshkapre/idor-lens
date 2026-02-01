@@ -40,6 +40,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Exit non-zero if any vulnerabilities are found (CI/regression mode)",
     )
+    p_run.add_argument(
+        "--proxy", help="Proxy URL for both victim and attacker (e.g. http://127.0.0.1:8080)"
+    )
+    p_run.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Disable TLS certificate verification (useful for local/self-signed targets)",
+    )
     p_run.set_defaults(func=_run)
 
     p_report = sub.add_parser("report", help="Render an HTML report from a JSONL run output")
@@ -91,6 +99,8 @@ def _run(args: argparse.Namespace) -> int:
         strict_body_match=bool(args.strict_body_match),
         fail_on_vuln=bool(args.fail_on_vuln),
         max_bytes=int(args.max_bytes),
+        verify_tls=(False if bool(args.insecure) else None),
+        proxy=(str(args.proxy) if args.proxy is not None else None),
     )
 
 
