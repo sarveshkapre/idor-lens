@@ -7,4 +7,4 @@
 ## Next
 
 - Auth token rotation helpers.
-- HTML report output.
+- Baseline compare mode (fail only on new vulns).

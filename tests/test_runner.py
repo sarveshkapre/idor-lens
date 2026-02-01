@@ -11,13 +11,14 @@ from idor_lens.runner import run_test
 
 
 class _Resp:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, content: bytes = b"") -> None:
         self.status_code = status_code
+        self.content = content
 
 
 def test_run_writes_report(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     def fake_request(*_args: Any, **_kwargs: Any) -> _Resp:
-        return _Resp(200)
+        return _Resp(200, b'{"ok":true}')
 
     monkeypatch.setattr(requests, "request", fake_request)
 
@@ -36,3 +37,28 @@ def test_run_writes_report(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     assert lines
     data = json.loads(lines[0])
     assert data["vulnerable"] is True
+
+
+def test_strict_body_match_requires_equal_bodies(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        if auth == "Bearer victim":
+            return _Resp(200, b'{"item":"victim"}')
+        return _Resp(200, b'{"item":"attacker"}')
+
+    monkeypatch.setattr(requests, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, strict_body_match=True)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["vulnerable"] is False
+    assert data["body_match"] is False
