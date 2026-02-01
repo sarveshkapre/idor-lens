@@ -37,6 +37,7 @@ python -m idor_lens --help
 - `idor-lens report` HTML renderer for clean triage.
 - `idor-lens compare` baseline vs current regression mode (new vulns only).
 - Cookie + preflight support for more realistic auth flows.
+- Env var expansion in spec strings (avoid hardcoding secrets).
 
 ## Next (tight scope)
 

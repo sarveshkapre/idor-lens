@@ -7,6 +7,7 @@
 - `idor-lens report` renders a clean HTML report from JSONL output.
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
 - Spec support for `victim/attacker` cookies + preflight requests.
+- Env var expansion in spec strings (`$VAR` / `${VAR}`).
 
 ### Changed
 
