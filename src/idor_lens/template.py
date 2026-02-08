@@ -50,7 +50,8 @@ attacker:
   # timeout: 10
 
 endpoints:
-  - path: /items/123
+  - name: item-read
+    path: /items/123
     method: GET
     # timeout: 10
     # victim_timeout: 10
@@ -64,6 +65,14 @@ endpoints:
     #   X-Request-ID: victim-req
     # attacker_headers:
     #   X-Request-ID: attacker-req
+    #
+    # Optional endpoint cookie overrides (merged into role cookie jars):
+    # cookies:
+    #   locale: en-US
+    # victim_cookies:
+    #   session: ${{VICTIM_SESSION_ALT}}
+    # attacker_cookies:
+    #   session: ${{ATTACKER_SESSION_ALT}}
     #
     # Optional request bodies (for POST/PUT/etc):
     # victim_body:

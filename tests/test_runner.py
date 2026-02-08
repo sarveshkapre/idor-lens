@@ -311,3 +311,54 @@ def test_timeout_overrides_are_applied(tmp_path: Path, monkeypatch: MonkeyPatch)
 
     assert seen_timeouts["victim"] == 1.5
     assert seen_timeouts["attacker"] == 1.2
+
+
+def test_endpoint_name_and_cookie_overrides_are_applied(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        seen.append(kwargs)
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n"
+        "  auth: Bearer victim\n"
+        "  cookies:\n"
+        "    session: victim-default\n"
+        "attacker:\n"
+        "  auth: Bearer attacker\n"
+        "  cookies:\n"
+        "    session: attacker-default\n"
+        "endpoints:\n"
+        "  - name: item read regression\n"
+        "    path: /items/123\n"
+        "    method: GET\n"
+        "    cookies:\n"
+        "      locale: en-US\n"
+        "    victim_cookies:\n"
+        "      session: victim-endpoint\n"
+        "    attacker_cookies:\n"
+        "      session: attacker-endpoint\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    assert len(seen) == 2
+    victim_call = next(
+        k for k in seen if (k.get("headers") or {}).get("Authorization") == "Bearer victim"
+    )
+    attacker_call = next(
+        k for k in seen if (k.get("headers") or {}).get("Authorization") == "Bearer attacker"
+    )
+    assert victim_call["cookies"] == {"locale": "en-US", "session": "victim-endpoint"}
+    assert attacker_call["cookies"] == {"locale": "en-US", "session": "attacker-endpoint"}
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["name"] == "item read regression"

@@ -19,16 +19,22 @@ def open_text_out(path: Path) -> TextIO:
     return path.open("w", encoding="utf-8")
 
 
-def read_jsonl_lines(lines: Iterable[str]) -> list[Any]:
+def read_jsonl_lines(lines: Iterable[str], *, source: str = "<input>") -> list[Any]:
     rows: list[Any] = []
-    for line in lines:
+    for line_num, line in enumerate(lines, start=1):
         s = line.strip()
         if not s:
             continue
-        rows.append(json.loads(s))
+        try:
+            rows.append(json.loads(s))
+        except json.JSONDecodeError as exc:
+            raise SystemExit(
+                f"invalid JSONL in {source} at line {line_num}: {exc.msg} (col {exc.colno})"
+            ) from exc
     return rows
 
 
 def read_jsonl(path: Path) -> list[Any]:
     with open_jsonl_in(path) as handle:
-        return read_jsonl_lines(handle)
+        source = "<stdin>" if str(path) == "-" else str(path)
+        return read_jsonl_lines(handle, source=source)

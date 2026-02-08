@@ -18,7 +18,7 @@ _DEFAULT_MAX_BYTES = 1024 * 1024
 _DEFAULT_RETRY_STATUSES = {429, 502, 503, 504}
 
 
-def _merge_headers(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
+def _merge_str_maps(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
     if not extra:
         return dict(base)
     merged = dict(base)
@@ -26,9 +26,14 @@ def _merge_headers(base: dict[str, str], extra: dict[str, str]) -> dict[str, str
     return merged
 
 
+def _merge_headers(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
+    return _merge_str_maps(base, extra)
+
+
 @dataclass(frozen=True)
 class Finding:
     endpoint: str
+    name: str | None
     method: str
     url: str
     victim_status: int
@@ -54,6 +59,7 @@ class Finding:
     def to_dict(self) -> dict[str, Any]:
         return {
             "endpoint": self.endpoint,
+            "name": self.name,
             "method": self.method,
             "url": self.url,
             "victim_status": self.victim_status,
@@ -109,7 +115,7 @@ def _as_bool(value: Any, *, name: str, default: bool) -> bool:
 def _as_int(value: Any, *, name: str, default: int) -> int:
     if value is None:
         return default
-    if isinstance(value, int):
+    if isinstance(value, int) and not isinstance(value, bool):
         return value
     raise SystemExit(f"{name} must be an integer")
 
@@ -117,7 +123,7 @@ def _as_int(value: Any, *, name: str, default: int) -> int:
 def _as_float(value: Any, *, name: str, default: float) -> float:
     if value is None:
         return default
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     raise SystemExit(f"{name} must be a number")
 
@@ -129,7 +135,7 @@ def _as_int_set(value: Any, *, name: str, default: set[int]) -> set[int]:
         raise SystemExit(f"{name} must be a list of integers")
     out: set[int] = set()
     for v in value:
-        if not isinstance(v, int):
+        if not isinstance(v, int) or isinstance(v, bool):
             raise SystemExit(f"{name} must be a list of integers")
         out.add(v)
     return out
@@ -169,6 +175,7 @@ def _request_with_proof(
     url: str,
     *,
     headers: dict[str, str],
+    cookies: dict[str, str] | None,
     json_body: Any,
     timeout: float,
     max_bytes: int,
@@ -195,6 +202,7 @@ def _request_with_proof(
                 method,
                 url,
                 headers=headers,
+                cookies=cookies,
                 json=json_body,
                 timeout=timeout,
                 verify=verify_tls,
@@ -242,10 +250,15 @@ def _request_with_proof(
 
 
 def _apply_cookies(session: requests.Session, cookies: dict[str, str], *, name: str) -> None:
+    _validate_cookie_keys(cookies, name=name)
     for k, v in cookies.items():
+        session.cookies.set(k, v)
+
+
+def _validate_cookie_keys(cookies: dict[str, str], *, name: str) -> None:
+    for k in cookies:
         if not k:
             raise SystemExit(f"{name}.cookies keys must be non-empty strings")
-        session.cookies.set(k, v)
 
 
 def _run_preflight(
@@ -295,6 +308,7 @@ def _run_preflight(
             method.upper(),
             url,
             headers=step_headers,
+            cookies=None,
             json_body=body,
             timeout=float(step_timeout),
             max_bytes=max_bytes,
@@ -497,30 +511,41 @@ def run_test(
     out_handle = None if is_stdout else out_path.open("w", encoding="utf-8")
     try:
         out = out_handle if out_handle is not None else sys.stdout
-        for ep in endpoints:
+        for idx, ep in enumerate(endpoints, start=1):
             if not isinstance(ep, dict):
                 raise SystemExit("each endpoints[] entry must be a mapping")
-            path = ep.get("path", "/")
-            if not isinstance(path, str):
-                raise SystemExit("endpoint path must be a string")
+            path = ep.get("path")
+            if not isinstance(path, str) or not path:
+                raise SystemExit("endpoint path must be a non-empty string")
+            name_raw = ep.get("name")
+            if name_raw is not None and (not isinstance(name_raw, str) or not name_raw):
+                raise SystemExit(f"endpoints[{idx}].name must be a non-empty string")
+            endpoint_name = name_raw if isinstance(name_raw, str) else None
             method = ep.get("method", "GET")
-            if not isinstance(method, str):
-                raise SystemExit("endpoint method must be a string")
+            if not isinstance(method, str) or not method:
+                raise SystemExit("endpoint method must be a non-empty string")
             method = method.upper()
 
-            common_headers = _as_str_dict(ep.get("headers"), name=f"endpoints[{total + 1}].headers")
+            common_headers = _as_str_dict(ep.get("headers"), name=f"endpoints[{idx}].headers")
             victim_headers = _merge_headers(
                 _merge_headers(victim_headers_base, common_headers),
-                _as_str_dict(
-                    ep.get("victim_headers"), name=f"endpoints[{total + 1}].victim_headers"
-                ),
+                _as_str_dict(ep.get("victim_headers"), name=f"endpoints[{idx}].victim_headers"),
             )
             attacker_headers = _merge_headers(
                 _merge_headers(attacker_headers_base, common_headers),
-                _as_str_dict(
-                    ep.get("attacker_headers"), name=f"endpoints[{total + 1}].attacker_headers"
-                ),
+                _as_str_dict(ep.get("attacker_headers"), name=f"endpoints[{idx}].attacker_headers"),
             )
+            common_cookies = _as_str_dict(ep.get("cookies"), name=f"endpoints[{idx}].cookies")
+            victim_request_cookies = _merge_str_maps(
+                common_cookies,
+                _as_str_dict(ep.get("victim_cookies"), name=f"endpoints[{idx}].victim_cookies"),
+            )
+            attacker_request_cookies = _merge_str_maps(
+                common_cookies,
+                _as_str_dict(ep.get("attacker_cookies"), name=f"endpoints[{idx}].attacker_cookies"),
+            )
+            _validate_cookie_keys(victim_request_cookies, name=f"endpoints[{idx}].victim")
+            _validate_cookie_keys(attacker_request_cookies, name=f"endpoints[{idx}].attacker")
             victim_body = ep.get("victim_body")
             attacker_body = ep.get("attacker_body", victim_body)
 
@@ -530,10 +555,10 @@ def run_test(
             ep_timeout_raw = ep.get("timeout")
             if ep_timeout_raw is not None:
                 ep_timeout = _as_float(
-                    ep_timeout_raw, name=f"endpoints[{total + 1}].timeout", default=float(timeout)
+                    ep_timeout_raw, name=f"endpoints[{idx}].timeout", default=float(timeout)
                 )
                 if ep_timeout <= 0:
-                    raise SystemExit(f"endpoints[{total + 1}].timeout must be > 0")
+                    raise SystemExit(f"endpoints[{idx}].timeout must be > 0")
                 victim_timeout = ep_timeout
                 attacker_timeout = ep_timeout
 
@@ -541,35 +566,35 @@ def run_test(
             if victim_timeout_raw is not None:
                 victim_timeout = _as_float(
                     victim_timeout_raw,
-                    name=f"endpoints[{total + 1}].victim_timeout",
+                    name=f"endpoints[{idx}].victim_timeout",
                     default=victim_timeout,
                 )
                 if victim_timeout <= 0:
-                    raise SystemExit(f"endpoints[{total + 1}].victim_timeout must be > 0")
+                    raise SystemExit(f"endpoints[{idx}].victim_timeout must be > 0")
 
             attacker_timeout_raw = ep.get("attacker_timeout")
             if attacker_timeout_raw is not None:
                 attacker_timeout = _as_float(
                     attacker_timeout_raw,
-                    name=f"endpoints[{total + 1}].attacker_timeout",
+                    name=f"endpoints[{idx}].attacker_timeout",
                     default=attacker_timeout,
                 )
                 if attacker_timeout <= 0:
-                    raise SystemExit(f"endpoints[{total + 1}].attacker_timeout must be > 0")
+                    raise SystemExit(f"endpoints[{idx}].attacker_timeout must be > 0")
 
             ep_follow_redirects = _as_bool(
                 ep.get("follow_redirects"),
-                name=f"endpoints[{total + 1}].follow_redirects",
+                name=f"endpoints[{idx}].follow_redirects",
                 default=follow_redirects_effective,
             )
             victim_ep_follow_redirects = _as_bool(
                 ep.get("victim_follow_redirects"),
-                name=f"endpoints[{total + 1}].victim_follow_redirects",
+                name=f"endpoints[{idx}].victim_follow_redirects",
                 default=ep_follow_redirects,
             )
             attacker_ep_follow_redirects = _as_bool(
                 ep.get("attacker_follow_redirects"),
-                name=f"endpoints[{total + 1}].attacker_follow_redirects",
+                name=f"endpoints[{idx}].attacker_follow_redirects",
                 default=ep_follow_redirects,
             )
 
@@ -580,6 +605,7 @@ def run_test(
                 method,
                 url,
                 headers=victim_headers,
+                cookies=(victim_request_cookies or None),
                 json_body=victim_body,
                 timeout=victim_timeout,
                 max_bytes=max_bytes,
@@ -595,6 +621,7 @@ def run_test(
                 method,
                 url,
                 headers=attacker_headers,
+                cookies=(attacker_request_cookies or None),
                 json_body=attacker_body,
                 timeout=attacker_timeout,
                 max_bytes=max_bytes,
@@ -646,6 +673,7 @@ def run_test(
 
             finding = Finding(
                 endpoint=path,
+                name=endpoint_name,
                 method=method,
                 url=url,
                 victim_status=v.status,

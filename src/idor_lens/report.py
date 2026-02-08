@@ -12,6 +12,7 @@ from .jsonl import open_text_out, read_jsonl
 @dataclass(frozen=True)
 class ReportRow:
     endpoint: str
+    name: str
     method: str
     url: str
     victim_status: int
@@ -62,6 +63,7 @@ def _as_str(value: Any, *, default: str = "") -> str:
 def _to_report_row(d: dict[str, Any]) -> ReportRow:
     return ReportRow(
         endpoint=_as_str(d.get("endpoint"), default="/"),
+        name=_as_str(d.get("name"), default=""),
         method=_as_str(d.get("method"), default="GET"),
         url=_as_str(d.get("url"), default=""),
         victim_status=_as_int(d.get("victim_status"), default=0),
@@ -203,7 +205,7 @@ def _render_html(
             )
 
         # Data attributes for client-side filtering.
-        searchable = " ".join([r.endpoint, r.method, r.url, r.reason, r.confidence]).lower()
+        searchable = " ".join([r.name, r.endpoint, r.method, r.url, r.reason, r.confidence]).lower()
         row_html.append(
             "<tr "
             f"data-idx='{idx}' "
@@ -212,6 +214,7 @@ def _render_html(
             f"data-search='{escape(searchable)}'"
             ">"
             f"<td class='mono'>{escape(r.method)}</td>"
+            f"<td>{escape(r.name or '-')}</td>"
             f"<td class='mono'>{escape(r.endpoint)}</td>"
             f"<td class='mono'>{escape(r.url)}</td>"
             f"<td class='num'>{r.victim_status}</td>"
@@ -442,6 +445,7 @@ def _render_html(
         <thead>
           <tr>
             <th>Method</th>
+            <th>Name</th>
             <th>Endpoint</th>
             <th>URL</th>
             <th class="num">Victim</th>

@@ -66,3 +66,16 @@ def test_compare_can_write_json_output(tmp_path: Path) -> None:
 
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["new_vulnerable"] == ["GET /a"]
+
+
+def test_compare_prefers_name_for_keys(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.jsonl"
+    baseline.write_text("", encoding="utf-8")
+    current = tmp_path / "current.jsonl"
+    current.write_text(
+        '{"name":"scenario one","endpoint":"/a","method":"GET","vulnerable":true,"confidence":"high"}\n',
+        encoding="utf-8",
+    )
+
+    summary = compare_jsonl(baseline, current)
+    assert summary.new_vulnerable == ["GET scenario one"]

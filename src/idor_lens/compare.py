@@ -46,6 +46,7 @@ def _min_rank(min_confidence: str) -> int:
 
 def _key(item: Mapping[str, Any]) -> str:
     method = item.get("method")
+    name = item.get("name")
     endpoint = item.get("endpoint")
     url = item.get("url")
 
@@ -54,6 +55,8 @@ def _key(item: Mapping[str, Any]) -> str:
     else:
         m = "GET"
 
+    if isinstance(name, str) and name:
+        return f"{m} {name}"
     if isinstance(endpoint, str) and endpoint:
         return f"{m} {endpoint}"
     if isinstance(url, str) and url:

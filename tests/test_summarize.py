@@ -39,3 +39,13 @@ def test_summarize_json_output(tmp_path: Path) -> None:
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["vulnerable"] == 1
     assert data["vulnerable_keys"] == ["GET /a"]
+
+
+def test_summarize_prefers_name_for_keys(tmp_path: Path) -> None:
+    inp = tmp_path / "in.jsonl"
+    inp.write_text(
+        '{"name":"scenario one","endpoint":"/a","method":"GET","vulnerable":true,"confidence":"high"}\n',
+        encoding="utf-8",
+    )
+    s = summarize_jsonl(inp, min_confidence="high")
+    assert s.vulnerable_keys == ["GET scenario one"]
