@@ -44,11 +44,18 @@ python -m idor_lens --help
 - `idor-lens validate` (fail fast on missing env vars).
 - `idor-lens summarize` (CI-friendly counts from JSONL).
 
+## Shipped (2026-02-08)
+
+- Endpoint-level cookie overrides via `endpoints[].cookies`, `victim_cookies`, and `attacker_cookies`.
+- Optional endpoint `name` labels in JSONL findings, report, compare, and summarize outputs.
+- `idor-lens validate` now enforces run-critical schema checks (types/ranges for retry/timeout fields, header/cookie maps, and preflight shape).
+- JSONL parsing errors now include source + line/column diagnostics.
+
 ## Next (tight scope)
 
-- Add baseline regression compare mode (fail only on new vulns).
-- Improve auth realism (cookie support and/or preflight requests).
-  - Add per-endpoint cookie overrides if needed.
+- Add auth token rotation helpers for expiring credentials during long scans.
+- Add request body modes beyond JSON (`data`/raw payload support) for broader API compatibility.
+- Add configurable deny-status heuristics to reduce status-only false positives in edge cases.
 
 ## Non-goals (near-term)
 

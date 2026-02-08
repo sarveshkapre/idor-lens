@@ -37,6 +37,8 @@ Validate structure and (optionally) fail if env vars are missing:
 python -m idor_lens validate --spec spec.yml --require-env
 ```
 
+Validation checks run-critical schema fields too (timeouts/retries, preflight shape, and header/cookie map types) so bad specs fail fast before requests are sent.
+
 ### Auth realism (cookies + preflight)
 
 Many apps need cookies/CSRF/bootstrap requests before protected endpoints behave realistically.
@@ -60,8 +62,15 @@ attacker:
     - path: /bootstrap
       method: GET
 endpoints:
-  - path: /items/123
+  - name: item-read
+    path: /items/123
     method: GET
+    cookies:
+      locale: en-US
+    victim_cookies:
+      session: victim_session_override
+    attacker_cookies:
+      session: attacker_session_override
 ```
 
 Tips:
@@ -73,6 +82,7 @@ Tips:
 - By default redirects are not followed; use `--follow-redirects` if needed.
 - For flaky targets, use `--retries 2 --retry-backoff 0.25` (retries 429/502/503/504 + timeouts).
 - Use `victim.timeout` / `attacker.timeout` / per-endpoint `timeout` overrides for slow endpoints.
+- Use endpoint `name` to label scenarios; compare/summarize keys prefer this when present.
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
 - Use `--strict-body-match` to reduce false positives when attacker gets a different 2xx body.

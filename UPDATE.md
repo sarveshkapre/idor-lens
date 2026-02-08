@@ -1,3 +1,23 @@
+# Update (2026-02-08)
+
+## Summary
+
+- Added endpoint-level cookie overrides: `endpoints[].cookies`, `victim_cookies`, and `attacker_cookies`.
+- Added optional endpoint `name` labels in findings and surfaced them in report/compare/summarize outputs.
+- Hardened `idor-lens validate` with run-critical schema checks (preflight structure, timeout/retry ranges, headers/cookies map typing).
+- Improved malformed JSONL diagnostics with source + line/column information.
+
+## Verification evidence
+
+```bash
+make check
+```
+
+```bash
+python -m idor_lens run --spec /tmp/idor_smoke_spec.yml --out /tmp/idor_smoke_report.jsonl --strict-body-match
+python -m idor_lens summarize --in /tmp/idor_smoke_report.jsonl
+```
+
 # Update (2026-02-01)
 
 ## Summary

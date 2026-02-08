@@ -7,4 +7,5 @@
 ## Next
 
 - Auth token rotation helpers.
-- Baseline compare mode (fail only on new vulns).
+- Request payload modes beyond JSON (`data`/raw body).
+- Configurable deny-status heuristics for noisy targets.
