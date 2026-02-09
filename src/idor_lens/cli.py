@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .compare import compare_jsonl, write_compare_output
 from .jsonl import open_text_out
+from .junit import write_junit_report
 from .report import write_html_report
 from .runner import run_test
 from .summarize import summarize_jsonl, write_summary
@@ -151,6 +152,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_summarize.set_defaults(func=_summarize)
 
+    p_junit = sub.add_parser("junit", help="Write a JUnit XML report from a JSONL run output")
+    p_junit.add_argument(
+        "--in", dest="in_path", required=True, help="Input JSONL path, or '-' for stdin"
+    )
+    p_junit.add_argument(
+        "--out", dest="out_path", default="-", help="Output path (default: stdout)"
+    )
+    p_junit.add_argument(
+        "--min-confidence",
+        default="medium",
+        choices=["none", "medium", "high"],
+        help="Treat vulnerabilities below this confidence as non-vulnerable",
+    )
+    p_junit.set_defaults(func=_junit)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -211,6 +227,15 @@ def _validate(args: argparse.Namespace) -> int:
 def _summarize(args: argparse.Namespace) -> int:
     summary = summarize_jsonl(Path(args.in_path), min_confidence=str(args.min_confidence))
     write_summary(summary, Path(args.out_path), as_json=bool(args.json))
+    return 0
+
+
+def _junit(args: argparse.Namespace) -> int:
+    write_junit_report(
+        Path(args.in_path),
+        Path(args.out_path),
+        min_confidence=str(args.min_confidence),
+    )
     return 0
 
 

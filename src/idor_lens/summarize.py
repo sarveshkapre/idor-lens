@@ -3,50 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from .findings import is_vulnerable, key as finding_key, min_rank
 from .jsonl import open_text_out, read_jsonl
-
-
-def _confidence_rank(value: Any) -> int:
-    if value == "high":
-        return 2
-    if value == "medium":
-        return 1
-    return 0
-
-
-def _min_rank(min_confidence: str) -> int:
-    if min_confidence not in {"high", "medium", "none"}:
-        raise SystemExit("--min-confidence must be one of: none, medium, high")
-    return _confidence_rank(min_confidence)
-
-
-def _key(item: Mapping[str, Any]) -> str:
-    method = item.get("method")
-    name = item.get("name")
-    endpoint = item.get("endpoint")
-    url = item.get("url")
-
-    if isinstance(method, str):
-        m = method.upper()
-    else:
-        m = "GET"
-
-    if isinstance(name, str) and name:
-        return f"{m} {name}"
-    if isinstance(endpoint, str) and endpoint:
-        return f"{m} {endpoint}"
-    if isinstance(url, str) and url:
-        return f"{m} {url}"
-    return m
-
-
-def _is_vulnerable(item: Mapping[str, Any], *, min_rank: int) -> bool:
-    vuln = item.get("vulnerable") is True
-    if not vuln:
-        return False
-    return _confidence_rank(item.get("confidence")) >= min_rank
 
 
 @dataclass(frozen=True)
@@ -72,11 +32,11 @@ class Summary:
 
 
 def summarize_jsonl(in_path: Path, *, min_confidence: str = "medium") -> Summary:
-    min_rank = _min_rank(min_confidence)
+    min_conf = min_rank(min_confidence)
     items = [x for x in read_jsonl(in_path) if isinstance(x, dict)]
 
-    vulns: list[dict[str, Any]] = [d for d in items if _is_vulnerable(d, min_rank=min_rank)]
-    keys = sorted({_key(d) for d in vulns})
+    vulns: list[dict[str, Any]] = [d for d in items if is_vulnerable(d, min_rank=min_conf)]
+    keys = sorted({finding_key(d) for d in vulns})
 
     high = sum(1 for d in vulns if d.get("confidence") == "high")
     medium = sum(1 for d in vulns if d.get("confidence") == "medium")

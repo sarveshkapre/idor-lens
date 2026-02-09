@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from .findings import is_vulnerable, key as finding_key, min_rank
 from .jsonl import open_text_out, read_jsonl
 
 
@@ -30,60 +31,23 @@ class CompareSummary:
         }
 
 
-def _confidence_rank(value: Any) -> int:
-    if value == "high":
-        return 2
-    if value == "medium":
-        return 1
-    return 0
-
-
-def _min_rank(min_confidence: str) -> int:
-    if min_confidence not in {"high", "medium", "none"}:
-        raise SystemExit("--min-confidence must be one of: none, medium, high")
-    return _confidence_rank(min_confidence)
-
-
-def _key(item: Mapping[str, Any]) -> str:
-    method = item.get("method")
-    name = item.get("name")
-    endpoint = item.get("endpoint")
-    url = item.get("url")
-
-    if isinstance(method, str):
-        m = method.upper()
-    else:
-        m = "GET"
-
-    if isinstance(name, str) and name:
-        return f"{m} {name}"
-    if isinstance(endpoint, str) and endpoint:
-        return f"{m} {endpoint}"
-    if isinstance(url, str) and url:
-        return f"{m} {url}"
-    return m
-
-
-def _is_vulnerable(item: Mapping[str, Any], *, min_rank: int) -> bool:
-    vuln = item.get("vulnerable") is True
-    if not vuln:
-        return False
-    return _confidence_rank(item.get("confidence")) >= min_rank
-
-
 def compare_jsonl(
     baseline_path: Path,
     current_path: Path,
     *,
     min_confidence: str = "medium",
 ) -> CompareSummary:
-    min_rank = _min_rank(min_confidence)
+    min_conf = min_rank(min_confidence)
 
     baseline_items = [x for x in read_jsonl(baseline_path) if isinstance(x, dict)]
     current_items = [x for x in read_jsonl(current_path) if isinstance(x, dict)]
 
-    baseline_vuln_keys = {_key(d) for d in baseline_items if _is_vulnerable(d, min_rank=min_rank)}
-    current_vuln_keys = {_key(d) for d in current_items if _is_vulnerable(d, min_rank=min_rank)}
+    baseline_vuln_keys = {
+        finding_key(d) for d in baseline_items if is_vulnerable(d, min_rank=min_conf)
+    }
+    current_vuln_keys = {
+        finding_key(d) for d in current_items if is_vulnerable(d, min_rank=min_conf)
+    }
 
     new = sorted(current_vuln_keys - baseline_vuln_keys)
     resolved = sorted(baseline_vuln_keys - current_vuln_keys)

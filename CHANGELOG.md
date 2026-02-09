@@ -6,6 +6,7 @@
 
 - `idor-lens report` renders a clean HTML report from JSONL output.
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
+- `idor-lens junit` writes JUnit XML from JSONL output (CI ingestion).
 - `idor-lens init` writes a starter YAML spec.
 - `idor-lens validate` validates a spec and can fail on missing env vars.
 - `idor-lens summarize` summarizes JSONL output for CI/terminal use.

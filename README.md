@@ -135,6 +135,12 @@ python -m idor_lens report --in idor-report.jsonl --out idor-report.html
 python -m idor_lens summarize --in idor-report.jsonl
 ```
 
+## JUnit XML (CI)
+
+```bash
+python -m idor_lens junit --in idor-report.jsonl --out idor-report.junit.xml
+```
+
 ## Regression compare
 
 Compare a baseline run to a new run and fail CI only when *new* vulnerabilities appear:
