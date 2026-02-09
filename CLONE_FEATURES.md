@@ -7,9 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P0 (Selected): Add configurable deny-response heuristics for noisy targets where access denial returns 2xx.
-  - Proposed: `deny_contains` / `deny_regex` patterns (spec-level + per-endpoint), applied to responses to override the status-only signal.
-  - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium.
 - [ ] P1 (Selected): Add first-class CI workflow examples (GitHub Actions) using `--fail-on-vuln`, compare baseline mode, and SARIF upload.
   - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
 - [ ] P1: Improve response diffing: allow ignoring dynamic fields (e.g. timestamps) for strict matching via `json_ignore_paths`.
@@ -26,6 +23,8 @@
   - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=medium.
 
 ## Implemented
+- [x] 2026-02-09: Added configurable deny-response heuristics via `deny_contains` / `deny_regex` (spec-level + per-endpoint).
+  Evidence: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/template.py`, `src/idor_lens/report.py`, `tests/test_runner.py`, `tests/test_validate.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Added SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboard ingestion.
   Evidence: `src/idor_lens/sarif.py`, `src/idor_lens/cli.py`, `tests/test_sarif.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Added JUnit XML export (`idor-lens junit`) for CI ingestion.

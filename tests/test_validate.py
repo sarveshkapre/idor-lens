@@ -118,6 +118,46 @@ def test_validate_accepts_payload_modes_and_content_type(tmp_path: Path) -> None
     assert validate_spec(spec, require_env=True) == 0
 
 
+def test_validate_accepts_deny_heuristics(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "deny_contains:\n"
+        "  - access denied\n"
+        "deny_regex:\n"
+        "  - (?i)not authorized\n"
+        "endpoints:\n"
+        "  - path: /items/123\n"
+        "    deny_contains:\n"
+        "      - forbidden\n",
+        encoding="utf-8",
+    )
+    assert validate_spec(spec, require_env=True) == 0
+
+
+def test_validate_rejects_invalid_deny_regex(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        'base_url: https://example.test\ndeny_regex:\n  - "["\nendpoints:\n  - path: /items/123\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="deny_regex\\[1\\] is not a valid regex"):
+        validate_spec(spec, require_env=True)
+
+
+def test_validate_rejects_non_list_deny_contains(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "deny_contains: access denied\n"
+        "endpoints:\n"
+        "  - path: /items/123\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="deny_contains must be a list of strings"):
+        validate_spec(spec, require_env=True)
+
+
 def test_validate_rejects_unknown_body_mode(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yml"
     spec.write_text(

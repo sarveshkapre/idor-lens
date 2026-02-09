@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -59,6 +60,8 @@ class Finding:
     attacker_truncated: bool
     victim_error: str | None
     attacker_error: str | None
+    victim_deny_match: bool
+    attacker_deny_match: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -85,6 +88,8 @@ class Finding:
             "attacker_truncated": self.attacker_truncated,
             "victim_error": self.victim_error,
             "attacker_error": self.attacker_error,
+            "victim_deny_match": self.victim_deny_match,
+            "attacker_deny_match": self.attacker_deny_match,
         }
 
 
@@ -162,6 +167,30 @@ def _as_optional_non_empty_str(value: Any, *, name: str) -> str | None:
     return parsed
 
 
+def _as_str_list(value: Any, *, name: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise SystemExit(f"{name} must be a list of strings")
+    out: list[str] = []
+    for v in value:
+        if not isinstance(v, str) or not v:
+            raise SystemExit(f"{name} must be a list of non-empty strings")
+        out.append(v)
+    return out
+
+
+def _as_regex_list(value: Any, *, name: str) -> list[re.Pattern[str]]:
+    patterns = _as_str_list(value, name=name)
+    compiled: list[re.Pattern[str]] = []
+    for idx, p in enumerate(patterns, start=1):
+        try:
+            compiled.append(re.compile(p))
+        except re.error as exc:
+            raise SystemExit(f"{name}[{idx}] is not a valid regex: {exc}") from exc
+    return compiled
+
+
 def _as_body_mode(value: Any, *, name: str, default: str) -> str:
     if value is None:
         return default
@@ -191,6 +220,7 @@ class _Proof:
     truncated: bool
     error: str | None
     attempts: int
+    deny_match: bool
 
 
 @dataclass(frozen=True)
@@ -268,6 +298,8 @@ def _request_with_proof(
     retries: int,
     retry_backoff_s: float,
     retry_statuses: set[int],
+    deny_contains: list[str],
+    deny_regexes: list[re.Pattern[str]],
 ) -> _Proof:
     start = time.time()
     proxies = _proxies(proxy)
@@ -275,6 +307,7 @@ def _request_with_proof(
     last_error: str | None = None
     last_status = 0
     last_body: bytes = b""
+    deny_match = False
     attempts_used = 0
 
     max_attempts = retries + 1
@@ -299,6 +332,22 @@ def _request_with_proof(
                 body = str(body).encode("utf-8", errors="replace")
             last_body = bytes(body)
             last_error = None
+            deny_match = False
+
+            if (deny_contains or deny_regexes) and last_body:
+                # Only examine the first max_bytes since we already hash at most that much.
+                sample = last_body[:max_bytes]
+                text = sample.decode("utf-8", errors="replace")
+                lower = text.lower()
+                for needle in deny_contains:
+                    if needle.lower() in lower:
+                        deny_match = True
+                        break
+                if not deny_match:
+                    for rx in deny_regexes:
+                        if rx.search(text) is not None:
+                            deny_match = True
+                            break
 
             should_retry = attempt < max_attempts and last_status in retry_statuses
             if should_retry:
@@ -330,6 +379,7 @@ def _request_with_proof(
         truncated=truncated,
         error=last_error,
         attempts=attempts_used,
+        deny_match=deny_match,
     )
 
 
@@ -419,6 +469,8 @@ def _run_preflight(
             retries=retries,
             retry_backoff_s=retry_backoff_s,
             retry_statuses=retry_statuses,
+            deny_contains=[],
+            deny_regexes=[],
         )
         if proof.error:
             raise SystemExit(
@@ -495,6 +547,9 @@ def run_test(
         name="retry_statuses",
         default=_DEFAULT_RETRY_STATUSES,
     )
+
+    spec_deny_contains = _as_str_list(spec.get("deny_contains"), name="deny_contains")
+    spec_deny_regexes = _as_regex_list(spec.get("deny_regex"), name="deny_regex")
 
     victim_token = victim.get("auth")
     attacker_token = attacker.get("auth")
@@ -746,6 +801,15 @@ def run_test(
                 default=ep_follow_redirects,
             )
 
+            ep_deny_contains = _as_str_list(
+                ep.get("deny_contains"), name=f"endpoints[{idx}].deny_contains"
+            )
+            ep_deny_regexes = _as_regex_list(
+                ep.get("deny_regex"), name=f"endpoints[{idx}].deny_regex"
+            )
+            deny_contains = [*spec_deny_contains, *ep_deny_contains]
+            deny_regexes = [*spec_deny_regexes, *ep_deny_regexes]
+
             url = urljoin(base_url, path)
             start_total = time.time()
             v = _request_with_proof(
@@ -764,6 +828,8 @@ def run_test(
                 retries=victim_retries,
                 retry_backoff_s=victim_retry_backoff_s,
                 retry_statuses=retry_statuses,
+                deny_contains=deny_contains,
+                deny_regexes=deny_regexes,
             )
             a = _request_with_proof(
                 attacker_session.request,
@@ -781,11 +847,15 @@ def run_test(
                 retries=attacker_retries,
                 retry_backoff_s=attacker_retry_backoff_s,
                 retry_statuses=retry_statuses,
+                deny_contains=deny_contains,
+                deny_regexes=deny_regexes,
             )
             elapsed = int((time.time() - start_total) * 1000)
 
-            victim_ok = 200 <= v.status < 300
-            attacker_ok = 200 <= a.status < 300
+            victim_2xx = 200 <= v.status < 300
+            attacker_2xx = 200 <= a.status < 300
+            victim_ok = victim_2xx and not v.deny_match
+            attacker_ok = attacker_2xx and not a.deny_match
             body_match = (
                 v.sha256 is not None
                 and v.sha256 == a.sha256
@@ -806,10 +876,16 @@ def run_test(
                 reason = f"victim request error: {v.error}"
             elif a.error:
                 reason = f"attacker request error: {a.error}"
-            elif not victim_ok:
+            elif not victim_2xx:
                 reason = "victim not 2xx; cannot assess"
-            elif not attacker_ok:
+            elif v.deny_match and a.deny_match:
+                reason = "both roles matched deny heuristics; cannot assess"
+            elif v.deny_match:
+                reason = "victim matched deny heuristics; cannot assess"
+            elif not attacker_2xx:
                 reason = "attacker denied"
+            elif a.deny_match:
+                reason = "attacker denied (deny heuristics)"
             elif strict_body_match and not body_match:
                 reason = "attacker 2xx but response body differs (strict mode)"
             elif body_match:
@@ -845,6 +921,8 @@ def run_test(
                 attacker_truncated=a.truncated,
                 victim_error=v.error,
                 attacker_error=a.error,
+                victim_deny_match=bool(v.deny_match),
+                attacker_deny_match=bool(a.deny_match),
             )
             out.write(json.dumps(finding.to_dict()) + "\n")
     finally:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -86,6 +87,28 @@ def _require_int_list(value: Any, *, name: str) -> None:
     for item in value:
         if not isinstance(item, int) or isinstance(item, bool):
             raise SystemExit(f"{name} must be a list of integers")
+
+
+def _require_string_list(value: Any, *, name: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list):
+        raise SystemExit(f"{name} must be a list of strings")
+    for item in value:
+        if not isinstance(item, str) or not item:
+            raise SystemExit(f"{name} must be a list of non-empty strings")
+
+
+def _require_regex_list(value: Any, *, name: str) -> None:
+    if value is None:
+        return
+    _require_string_list(value, name=name)
+    assert isinstance(value, list)
+    for idx, pat in enumerate(value, start=1):
+        try:
+            re.compile(pat)
+        except re.error as exc:
+            raise SystemExit(f"{name}[{idx}] is not a valid regex: {exc}") from exc
 
 
 def _require_body_mode(value: Any, *, name: str, default: str) -> str:
@@ -193,6 +216,8 @@ def _validate_endpoint(value: Any, *, idx: int) -> None:
     _require_optional_non_empty_str(
         endpoint.get("attacker_content_type"), name=f"{name}.attacker_content_type"
     )
+    _require_string_list(endpoint.get("deny_contains"), name=f"{name}.deny_contains")
+    _require_regex_list(endpoint.get("deny_regex"), name=f"{name}.deny_regex")
 
     endpoint_body = endpoint.get("victim_body")
     attacker_body = endpoint.get("attacker_body", endpoint_body)
@@ -230,6 +255,8 @@ def validate_spec(spec_path: Path, *, require_env: bool) -> int:
     _require_non_negative_int(spec.get("retries"), name="retries")
     _require_non_negative_number(spec.get("retry_backoff_s"), name="retry_backoff_s")
     _require_int_list(spec.get("retry_statuses"), name="retry_statuses")
+    _require_string_list(spec.get("deny_contains"), name="deny_contains")
+    _require_regex_list(spec.get("deny_regex"), name="deny_regex")
 
     _validate_role(spec.get("victim", {}), name="victim")
     _validate_role(spec.get("attacker", {}), name="attacker")

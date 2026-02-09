@@ -34,6 +34,8 @@ class ReportRow:
     attacker_truncated: bool | None
     victim_error: str | None
     attacker_error: str | None
+    victim_deny_match: bool | None
+    attacker_deny_match: bool | None
 
 
 def _as_bool(value: Any, *, default: bool = False) -> bool:
@@ -102,6 +104,12 @@ def _to_report_row(d: dict[str, Any]) -> ReportRow:
         victim_error=d.get("victim_error") if isinstance(d.get("victim_error"), str) else None,
         attacker_error=d.get("attacker_error")
         if isinstance(d.get("attacker_error"), str)
+        else None,
+        victim_deny_match=d.get("victim_deny_match")
+        if isinstance(d.get("victim_deny_match"), bool)
+        else None,
+        attacker_deny_match=d.get("attacker_deny_match")
+        if isinstance(d.get("attacker_deny_match"), bool)
         else None,
     )
 
@@ -193,6 +201,14 @@ def _render_html(
         if r.attacker_error:
             details_bits.append(
                 f"<div><span class='k'>Attacker error</span> <code>{escape(r.attacker_error)}</code></div>"
+            )
+        if r.victim_deny_match is not None:
+            details_bits.append(
+                f"<div><span class='k'>Victim deny match</span> {str(r.victim_deny_match).lower()}</div>"
+            )
+        if r.attacker_deny_match is not None:
+            details_bits.append(
+                f"<div><span class='k'>Attacker deny match</span> {str(r.attacker_deny_match).lower()}</div>"
             )
 
         details_html = ""

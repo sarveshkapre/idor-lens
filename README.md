@@ -87,6 +87,7 @@ Tips:
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
 - Use `--strict-body-match` to reduce false positives when attacker gets a different 2xx body.
+- For apps that return a 2xx "access denied" page, use `deny_contains` / `deny_regex` in your spec to override status-only signals.
 
 ### Request body modes (`json`, `form`, `raw`)
 

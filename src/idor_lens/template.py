@@ -26,6 +26,14 @@ verify_tls: true
 # retries: 0
 # retry_backoff_s: 0.25
 
+# Optional: deny heuristics for noisy targets that return 2xx on access denial.
+# - deny_contains is matched case-insensitively as a substring.
+# - deny_regex is applied as a Python regex against the response text.
+# deny_contains:
+#   - access denied
+# deny_regex:
+#   - "(?i)not authorized"
+
 victim:
   # Typical header-based auth:
   auth: Bearer ${{VICTIM_TOKEN}}
