@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+import yaml
 
 from .compare import compare_jsonl, write_compare_output
 from .jsonl import open_text_out
@@ -10,6 +13,7 @@ from .junit import write_junit_report
 from .report import write_html_report
 from .runner import run_test
 from .sarif import write_sarif_report
+from .spec import load_spec
 from .summarize import summarize_jsonl, write_summary
 from .template import SpecTemplateOptions, render_spec_template
 from .validate import validate_spec
@@ -78,6 +82,64 @@ def main(argv: list[str] | None = None) -> int:
         help="Do not follow HTTP redirects",
     )
     p_run.set_defaults(func=_run)
+
+    p_replay = sub.add_parser(
+        "replay",
+        help="Replay a single endpoint from a spec (victim vs attacker) for debugging",
+    )
+    p_replay.add_argument("--spec", required=True, help="Path to YAML spec file")
+    g_sel = p_replay.add_mutually_exclusive_group(required=True)
+    g_sel.add_argument("--name", help="Replay the endpoint with this endpoints[].name")
+    g_sel.add_argument("--path", help="Replay the endpoint with this endpoints[].path")
+    g_sel.add_argument(
+        "--index",
+        type=int,
+        help="Replay the Nth endpoint in endpoints[] (1-based)",
+    )
+    p_replay.add_argument(
+        "--out", default="-", help="Output JSONL path, or '-' for stdout (default: '-')"
+    )
+    p_replay.add_argument("--timeout", type=float, default=10.0)
+    p_replay.add_argument(
+        "--max-bytes", type=int, default=1024 * 1024, help="Max bytes hashed per response"
+    )
+    p_replay.add_argument(
+        "--strict-body-match",
+        action="store_true",
+        help="Only flag vulnerability when attacker response body matches victim (best-effort)",
+    )
+    p_replay.add_argument(
+        "--retries",
+        type=int,
+        default=0,
+        help="Retry count for transient errors and 429/502/503/504 (default: 0)",
+    )
+    p_replay.add_argument(
+        "--retry-backoff",
+        type=float,
+        default=0.25,
+        help="Seconds for exponential backoff base between retries (default: 0.25)",
+    )
+    p_replay.add_argument(
+        "--proxy", help="Proxy URL for both victim and attacker (e.g. http://127.0.0.1:8080)"
+    )
+    p_replay.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Disable TLS certificate verification (useful for local/self-signed targets)",
+    )
+    g_replay_redirects = p_replay.add_mutually_exclusive_group()
+    g_replay_redirects.add_argument(
+        "--follow-redirects",
+        action="store_true",
+        help="Follow HTTP redirects (default: disabled to reduce false positives)",
+    )
+    g_replay_redirects.add_argument(
+        "--no-follow-redirects",
+        action="store_true",
+        help="Do not follow HTTP redirects",
+    )
+    p_replay.set_defaults(func=_replay)
 
     p_report = sub.add_parser("report", help="Render an HTML report from a JSONL run output")
     p_report.add_argument(
@@ -215,6 +277,76 @@ def _run(args: argparse.Namespace) -> int:
 def _report(args: argparse.Namespace) -> int:
     write_html_report(Path(args.in_path), Path(args.out_path), title=str(args.title))
     return 0
+
+
+def _replay(args: argparse.Namespace) -> int:
+    spec_path = Path(args.spec)
+    spec = load_spec(spec_path)
+    endpoints = spec.get("endpoints", [])
+    if not isinstance(endpoints, list) or not endpoints:
+        raise SystemExit("spec must include endpoints list")
+
+    selected: dict[object, object] | None = None
+    if args.index is not None:
+        if args.index <= 0 or args.index > len(endpoints):
+            raise SystemExit(f"--index must be between 1 and {len(endpoints)}")
+        ep = endpoints[int(args.index) - 1]
+        if not isinstance(ep, dict):
+            raise SystemExit("each endpoints[] entry must be a mapping")
+        selected = ep
+    elif args.name is not None:
+        matches = [
+            ep for ep in endpoints if isinstance(ep, dict) and ep.get("name") == str(args.name)
+        ]
+        if not matches:
+            raise SystemExit(f"no endpoint found with name={args.name!r}")
+        if len(matches) > 1:
+            raise SystemExit(f"multiple endpoints found with name={args.name!r}")
+        selected = matches[0]
+    elif args.path is not None:
+        matches = [
+            ep for ep in endpoints if isinstance(ep, dict) and ep.get("path") == str(args.path)
+        ]
+        if not matches:
+            raise SystemExit(f"no endpoint found with path={args.path!r}")
+        if len(matches) > 1:
+            raise SystemExit(f"multiple endpoints found with path={args.path!r}")
+        selected = matches[0]
+    else:
+        raise SystemExit("must select an endpoint via --name, --path, or --index")
+
+    narrowed = dict(spec)
+    narrowed["endpoints"] = [selected]
+
+    with tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False, encoding="utf-8") as f:
+        tmp_path = Path(f.name)
+        yaml.safe_dump(narrowed, f, sort_keys=False)
+
+    try:
+        return run_test(
+            tmp_path,
+            Path(args.out),
+            float(args.timeout),
+            strict_body_match=bool(args.strict_body_match),
+            fail_on_vuln=False,
+            max_bytes=int(args.max_bytes),
+            verify_tls=(False if bool(args.insecure) else None),
+            proxy=(str(args.proxy) if args.proxy is not None else None),
+            follow_redirects=(
+                True
+                if bool(args.follow_redirects)
+                else False
+                if bool(args.no_follow_redirects)
+                else None
+            ),
+            retries=int(args.retries),
+            retry_backoff_s=float(args.retry_backoff),
+        )
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
 
 
 def _compare(args: argparse.Namespace) -> int:

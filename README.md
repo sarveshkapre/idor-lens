@@ -147,6 +147,14 @@ python -m idor_lens report --in idor-report.jsonl --out idor-report.html
 python -m idor_lens summarize --in idor-report.jsonl
 ```
 
+## Replay A Single Endpoint (Debug)
+
+Replay one endpoint from a spec (useful while iterating on headers/cookies/deny heuristics):
+
+```bash
+python -m idor_lens replay --spec spec.yml --name item-read --out -
+```
+
 ## JUnit XML (CI)
 
 ```bash
