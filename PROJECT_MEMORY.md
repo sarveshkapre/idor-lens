@@ -36,7 +36,17 @@
   - Docs: `README.md`
   - Tests: `tests/test_smoke.py`
   - Verification: `make check` (pass)
-- Commit: `2690d34`
+- Commit: `2690d34`, `b756b56`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-09 - Mistake: replay Leaked Expanded Env Vars To Disk (Fixed)
+
+- Root cause: `idor-lens replay` initially loaded specs via `load_spec()`, which expands env vars. Narrowing then wrote a temporary YAML spec containing expanded secrets.
+- Fix: Load the raw YAML for replay (no env expansion) and let `run` perform env expansion at execution time.
+- Prevention rule: Avoid persisting expanded secret values when transforming specs; prefer operating on raw YAML and applying env expansion only at the point of request execution.
+- Evidence: `src/idor_lens/cli.py`; verification: `make check` (pass)
+- Commit: `b756b56`
 - Confidence: high
 - Trust label: verified-local
 
