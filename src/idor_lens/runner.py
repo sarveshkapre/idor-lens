@@ -338,6 +338,36 @@ def _request_with_proof(
     start = time.time()
     proxies = _proxies(proxy)
 
+    def _read_body_streaming(resp: Any, *, max_bytes: int) -> tuple[int, bytes]:
+        # Prefer streaming reads to avoid buffering large bodies in memory.
+        iter_content = getattr(resp, "iter_content", None)
+        if callable(iter_content):
+            sample_parts: list[bytes] = []
+            sample_len = 0
+            total = 0
+            try:
+                for chunk in iter_content(chunk_size=8192):
+                    if not chunk:
+                        continue
+                    b = bytes(chunk)
+                    total += len(b)
+                    if sample_len < max_bytes:
+                        take = b[: max_bytes - sample_len]
+                        if take:
+                            sample_parts.append(take)
+                            sample_len += len(take)
+            finally:
+                close = getattr(resp, "close", None)
+                if callable(close):
+                    close()
+            return total, b"".join(sample_parts)
+
+        body = getattr(resp, "content", b"") or b""
+        if not isinstance(body, (bytes, bytearray)):
+            body = str(body).encode("utf-8", errors="replace")
+        body_bytes = bytes(body)
+        return len(body_bytes), body_bytes[:max_bytes]
+
     last_error: str | None = None
     last_status = 0
     last_sample: bytes = b""
@@ -360,14 +390,10 @@ def _request_with_proof(
                 verify=verify_tls,
                 proxies=proxies,
                 allow_redirects=follow_redirects,
+                stream=True,
             )
             last_status = int(getattr(resp, "status_code", 0))
-            body = getattr(resp, "content", b"") or b""
-            if not isinstance(body, (bytes, bytearray)):
-                body = str(body).encode("utf-8", errors="replace")
-            body_bytes = bytes(body)
-            last_num_bytes = len(body_bytes)
-            last_sample = body_bytes[:max_bytes]
+            last_num_bytes, last_sample = _read_body_streaming(resp, max_bytes=max_bytes)
             last_error = None
             deny_match = False
 

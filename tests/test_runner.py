@@ -17,6 +17,14 @@ class _Resp:
         self.status_code = status_code
         self.content = content
 
+    def iter_content(self, *, chunk_size: int = 8192) -> list[bytes]:
+        # Minimal requests.Response-like interface for runner's streaming read path.
+        _ = chunk_size
+        return [self.content]
+
+    def close(self) -> None:
+        return
+
 
 def test_run_writes_report(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     seen: list[dict[str, Any]] = []
