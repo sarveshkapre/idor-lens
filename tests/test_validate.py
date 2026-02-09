@@ -21,6 +21,30 @@ def test_validate_ok(tmp_path: Path) -> None:
     assert validate_spec(spec, require_env=True) == 0
 
 
+def test_validate_accepts_auth_file(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth_file: /tmp/victim-auth.txt\n"
+        "attacker:\n  auth_file: /tmp/attacker-auth.txt\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    assert validate_spec(spec, require_env=True) == 0
+
+
+def test_validate_rejects_auth_and_auth_file_together(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer x\n  auth_file: /tmp/victim-auth.txt\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="victim must not set both auth and auth_file"):
+        validate_spec(spec, require_env=True)
+
+
 def test_validate_require_env_fails_on_unexpanded(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yml"
     spec.write_text(

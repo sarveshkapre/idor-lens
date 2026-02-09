@@ -464,6 +464,7 @@ def _run_preflight(
     name: str,
     base_url: str,
     base_headers: dict[str, str],
+    auth_token: str | None,
     preflight: Any,
     timeout: float,
     max_bytes: int,
@@ -497,6 +498,8 @@ def _run_preflight(
             base_headers,
             _as_str_dict(step.get("headers"), name=f"{name}.preflight[{idx}].headers"),
         )
+        if auth_token and not _has_header(step_headers, "Authorization"):
+            step_headers["Authorization"] = auth_token
         body = step.get("body")
         step_body_mode = _as_body_mode(
             step.get("body_mode"),
@@ -615,19 +618,34 @@ def run_test(
     spec_deny_regexes = _as_regex_list(spec.get("deny_regex"), name="deny_regex")
     spec_json_ignore_paths = _as_str_list(spec.get("json_ignore_paths"), name="json_ignore_paths")
 
-    victim_token = victim.get("auth")
-    attacker_token = attacker.get("auth")
-    if victim_token is not None and not isinstance(victim_token, str):
-        raise SystemExit("victim.auth must be a string")
-    if attacker_token is not None and not isinstance(attacker_token, str):
-        raise SystemExit("attacker.auth must be a string")
+    victim_token = _as_optional_non_empty_str(victim.get("auth"), name="victim.auth")
+    attacker_token = _as_optional_non_empty_str(attacker.get("auth"), name="attacker.auth")
+    victim_auth_file = _as_optional_non_empty_str(victim.get("auth_file"), name="victim.auth_file")
+    attacker_auth_file = _as_optional_non_empty_str(
+        attacker.get("auth_file"), name="attacker.auth_file"
+    )
+    if victim_token and victim_auth_file:
+        raise SystemExit("victim must not set both auth and auth_file")
+    if attacker_token and attacker_auth_file:
+        raise SystemExit("attacker must not set both auth and auth_file")
 
-    victim_headers_base = _headers(
-        victim_token, _as_str_dict(victim.get("headers"), name="victim.headers")
-    )
-    attacker_headers_base = _headers(
-        attacker_token, _as_str_dict(attacker.get("headers"), name="attacker.headers")
-    )
+    def _read_auth_file(path: str, *, role_name: str) -> str:
+        try:
+            data = Path(path).expanduser().read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            raise SystemExit(f"{role_name}.auth_file could not be read: {exc}") from exc
+        token = data.strip()
+        if not token:
+            raise SystemExit(f"{role_name}.auth_file must not be empty")
+        return token
+
+    def _load_role_auth(*, role_name: str, static: str | None, file_path: str | None) -> str | None:
+        if file_path:
+            return _read_auth_file(file_path, role_name=role_name)
+        return static
+
+    victim_headers_base = _as_str_dict(victim.get("headers"), name="victim.headers")
+    attacker_headers_base = _as_str_dict(attacker.get("headers"), name="attacker.headers")
     victim_cookies = _as_str_dict(victim.get("cookies"), name="victim.cookies")
     attacker_cookies = _as_str_dict(attacker.get("cookies"), name="attacker.cookies")
 
@@ -695,6 +713,9 @@ def run_test(
         name="victim",
         base_url=base_url,
         base_headers=victim_headers_base,
+        auth_token=_load_role_auth(
+            role_name="victim", static=victim_token, file_path=victim_auth_file
+        ),
         preflight=victim.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
@@ -710,6 +731,9 @@ def run_test(
         name="attacker",
         base_url=base_url,
         base_headers=attacker_headers_base,
+        auth_token=_load_role_auth(
+            role_name="attacker", static=attacker_token, file_path=attacker_auth_file
+        ),
         preflight=attacker.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
@@ -815,6 +839,18 @@ def run_test(
                 content_type=attacker_content_type,
                 name=f"endpoints[{idx}].attacker",
             )
+            victim_req_headers = dict(victim_payload.headers)
+            victim_auth = _load_role_auth(
+                role_name="victim", static=victim_token, file_path=victim_auth_file
+            )
+            if victim_auth and not _has_header(victim_req_headers, "Authorization"):
+                victim_req_headers["Authorization"] = victim_auth
+            attacker_req_headers = dict(attacker_payload.headers)
+            attacker_auth = _load_role_auth(
+                role_name="attacker", static=attacker_token, file_path=attacker_auth_file
+            )
+            if attacker_auth and not _has_header(attacker_req_headers, "Authorization"):
+                attacker_req_headers["Authorization"] = attacker_auth
 
             victim_timeout = victim_timeout_default
             attacker_timeout = attacker_timeout_default
@@ -884,7 +920,7 @@ def run_test(
                 victim_session.request,
                 method,
                 url,
-                headers=victim_payload.headers,
+                headers=victim_req_headers,
                 cookies=(victim_request_cookies or None),
                 json_body=victim_payload.json_body,
                 data_body=victim_payload.data_body,
@@ -903,7 +939,7 @@ def run_test(
                 attacker_session.request,
                 method,
                 url,
-                headers=attacker_payload.headers,
+                headers=attacker_req_headers,
                 cookies=(attacker_request_cookies or None),
                 json_body=attacker_payload.json_body,
                 data_body=attacker_payload.data_body,

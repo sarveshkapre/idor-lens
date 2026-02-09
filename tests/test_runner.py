@@ -195,6 +195,38 @@ def test_env_var_expansion_in_spec(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
     assert "Bearer attacker-token" in seen_auth
 
 
+def test_auth_file_is_read_per_request(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    token_path = tmp_path / "victim-auth.txt"
+    token_path.write_text("Bearer victim1\n", encoding="utf-8")
+
+    seen_auth: list[str | None] = []
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        seen_auth.append(auth)
+        if auth == "Bearer victim1":
+            token_path.write_text("Bearer victim2\n", encoding="utf-8")
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth_file: " + str(token_path) + "\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - path: /items/1\n    method: GET\n"
+        "  - path: /items/2\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    assert "Bearer victim1" in seen_auth
+    assert "Bearer victim2" in seen_auth
+
+
 def test_stdout_output_is_jsonl_only(
     tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:

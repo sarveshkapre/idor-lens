@@ -77,6 +77,8 @@ Tips:
 
 - Prefer env vars for secrets (strings support `$VAR` / `${VAR}` expansion):
   - `auth: Bearer ${VICTIM_TOKEN}`
+- For expiring credentials during long scans, rotate tokens via `auth_file` (file contents should be the full `Authorization` header value):
+  - `auth_file: /path/to/victim_auth.txt`
 - Use `--proxy http://127.0.0.1:8080` to route both roles through Burp/mitmproxy.
 - Use `--insecure` for self-signed TLS (e.g. local dev).
 - By default redirects are not followed; use `--follow-redirects` if needed.

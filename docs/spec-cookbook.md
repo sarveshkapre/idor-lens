@@ -15,6 +15,20 @@ attacker:
 
 Use `idor-lens validate --require-env` in CI to fail fast if variables are missing.
 
+## Token Rotation Via auth_file
+
+If your victim/attacker credentials expire during a long scan, read the Authorization header value from a file:
+
+```yaml
+victim:
+  auth_file: /path/to/victim_auth.txt
+attacker:
+  auth_file: /path/to/attacker_auth.txt
+```
+
+The file contents should be the full header value (for example: `Bearer eyJ...`). IDOR Lens reads the file for
+each request, so an external process can refresh tokens while the scan is running.
+
 ## Cookie Auth And Bootstrap (Preflight)
 
 If your app needs cookies, CSRF, or a bootstrap request before protected endpoints behave normally:
@@ -134,4 +148,3 @@ endpoints:
   - path: /items/123
     timeout: 15
 ```
-

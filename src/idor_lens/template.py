@@ -44,6 +44,8 @@ verify_tls: true
 victim:
   # Typical header-based auth:
   auth: Bearer ${{VICTIM_TOKEN}}
+  # Or read a rotating token from a file (contents should be the full header value):
+  # auth_file: /path/to/victim_auth.txt
   # Or supply extra headers:
   # headers:
   #   X-CSRF: ${{VICTIM_CSRF}}
@@ -65,6 +67,7 @@ victim:
 
 attacker:
   auth: Bearer ${{ATTACKER_TOKEN}}
+  # auth_file: /path/to/attacker_auth.txt
   # timeout: 10
 
 endpoints:

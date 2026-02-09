@@ -182,6 +182,9 @@ def _validate_preflight(value: Any, *, name: str) -> None:
 def _validate_role(value: Any, *, name: str) -> Mapping[str, Any]:
     role = _as_mapping(value, name=name)
     _require_optional_non_empty_str(role.get("auth"), name=f"{name}.auth")
+    _require_optional_non_empty_str(role.get("auth_file"), name=f"{name}.auth_file")
+    if role.get("auth") is not None and role.get("auth_file") is not None:
+        raise SystemExit(f"{name} must not set both auth and auth_file")
     _require_string_map(role.get("headers"), name=f"{name}.headers")
     _require_string_map(role.get("cookies"), name=f"{name}.cookies", non_empty_keys=True)
     _validate_preflight(role.get("preflight"), name=name)
