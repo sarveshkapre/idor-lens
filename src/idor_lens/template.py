@@ -44,6 +44,9 @@ victim:
   # preflight:
   #   - path: /bootstrap
   #     method: GET
+  #     body_mode: form # json (default) | form | raw
+  #     body:
+  #       csrf: ${{VICTIM_CSRF}}
 
 attacker:
   auth: Bearer ${{ATTACKER_TOKEN}}
@@ -75,8 +78,13 @@ endpoints:
     #   session: ${{ATTACKER_SESSION_ALT}}
     #
     # Optional request bodies (for POST/PUT/etc):
+    # body_mode: json # json (default) | form | raw
+    # content_type: application/json
     # victim_body:
     #   id: 123
     # attacker_body:
     #   id: 123
+    # victim_body_mode: raw
+    # victim_content_type: application/json
+    # victim_body: '{{"id":123}}'
 """

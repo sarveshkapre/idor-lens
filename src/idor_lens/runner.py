@@ -16,6 +16,10 @@ from .spec import load_spec
 
 _DEFAULT_MAX_BYTES = 1024 * 1024
 _DEFAULT_RETRY_STATUSES = {429, 502, 503, 504}
+_BODY_MODE_JSON = "json"
+_BODY_MODE_FORM = "form"
+_BODY_MODE_RAW = "raw"
+_BODY_MODES = {_BODY_MODE_JSON, _BODY_MODE_FORM, _BODY_MODE_RAW}
 
 
 def _merge_str_maps(base: dict[str, str], extra: dict[str, str]) -> dict[str, str]:
@@ -149,6 +153,26 @@ def _as_optional_str(value: Any, *, name: str) -> str | None:
     raise SystemExit(f"{name} must be a string")
 
 
+def _as_optional_non_empty_str(value: Any, *, name: str) -> str | None:
+    parsed = _as_optional_str(value, name=name)
+    if parsed is None:
+        return None
+    if not parsed:
+        raise SystemExit(f"{name} must be a non-empty string")
+    return parsed
+
+
+def _as_body_mode(value: Any, *, name: str, default: str) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"{name} must be one of: json, form, raw")
+    normalized = value.lower()
+    if normalized not in _BODY_MODES:
+        raise SystemExit(f"{name} must be one of: json, form, raw")
+    return normalized
+
+
 def _proxies(proxy: str | None) -> dict[str, str] | None:
     if proxy is None:
         return None
@@ -169,6 +193,64 @@ class _Proof:
     attempts: int
 
 
+@dataclass(frozen=True)
+class _PreparedPayload:
+    headers: dict[str, str]
+    json_body: Any
+    data_body: Any
+
+
+def _has_header(headers: dict[str, str], name: str) -> bool:
+    expected = name.lower()
+    return any(k.lower() == expected for k in headers)
+
+
+def _prepare_payload(
+    *,
+    headers: dict[str, str],
+    body: Any,
+    body_mode: str,
+    content_type: str | None,
+    name: str,
+) -> _PreparedPayload:
+    if body_mode not in _BODY_MODES:
+        raise SystemExit(f"{name}.body_mode must be one of: json, form, raw")
+
+    request_headers = dict(headers)
+    default_content_type: str | None = None
+    json_body: Any = None
+    data_body: Any = None
+
+    if body_mode == _BODY_MODE_JSON:
+        json_body = body
+    elif body_mode == _BODY_MODE_FORM:
+        if body is not None and not isinstance(body, dict):
+            raise SystemExit(f"{name}.body must be a mapping when body_mode=form")
+        if isinstance(body, dict):
+            for key in body:
+                if not isinstance(key, str):
+                    raise SystemExit(
+                        f"{name}.body must be a mapping with string keys when body_mode=form"
+                    )
+        data_body = body
+        default_content_type = "application/x-www-form-urlencoded"
+    else:
+        if body is not None and not isinstance(body, str):
+            raise SystemExit(f"{name}.body must be a string when body_mode=raw")
+        data_body = body
+        default_content_type = "text/plain; charset=utf-8"
+
+    effective_content_type = content_type or default_content_type
+    if effective_content_type and not _has_header(request_headers, "Content-Type"):
+        request_headers["Content-Type"] = effective_content_type
+
+    return _PreparedPayload(
+        headers=request_headers,
+        json_body=json_body,
+        data_body=data_body,
+    )
+
+
 def _request_with_proof(
     request_fn: Any,
     method: str,
@@ -177,6 +259,7 @@ def _request_with_proof(
     headers: dict[str, str],
     cookies: dict[str, str] | None,
     json_body: Any,
+    data_body: Any,
     timeout: float,
     max_bytes: int,
     verify_tls: bool,
@@ -204,6 +287,7 @@ def _request_with_proof(
                 headers=headers,
                 cookies=cookies,
                 json=json_body,
+                data=data_body,
                 timeout=timeout,
                 verify=verify_tls,
                 proxies=proxies,
@@ -301,15 +385,32 @@ def _run_preflight(
             _as_str_dict(step.get("headers"), name=f"{name}.preflight[{idx}].headers"),
         )
         body = step.get("body")
+        step_body_mode = _as_body_mode(
+            step.get("body_mode"),
+            name=f"{name}.preflight[{idx}].body_mode",
+            default=_BODY_MODE_JSON,
+        )
+        step_content_type = _as_optional_non_empty_str(
+            step.get("content_type"),
+            name=f"{name}.preflight[{idx}].content_type",
+        )
+        payload = _prepare_payload(
+            headers=step_headers,
+            body=body,
+            body_mode=step_body_mode,
+            content_type=step_content_type,
+            name=f"{name}.preflight[{idx}]",
+        )
         url = urljoin(base_url, path)
 
         proof = _request_with_proof(
             session.request,
             method.upper(),
             url,
-            headers=step_headers,
+            headers=payload.headers,
             cookies=None,
-            json_body=body,
+            json_body=payload.json_body,
+            data_body=payload.data_body,
             timeout=float(step_timeout),
             max_bytes=max_bytes,
             verify_tls=verify_tls,
@@ -548,6 +649,53 @@ def run_test(
             _validate_cookie_keys(attacker_request_cookies, name=f"endpoints[{idx}].attacker")
             victim_body = ep.get("victim_body")
             attacker_body = ep.get("attacker_body", victim_body)
+            endpoint_body_mode = _as_body_mode(
+                ep.get("body_mode"),
+                name=f"endpoints[{idx}].body_mode",
+                default=_BODY_MODE_JSON,
+            )
+            victim_body_mode = _as_body_mode(
+                ep.get("victim_body_mode"),
+                name=f"endpoints[{idx}].victim_body_mode",
+                default=endpoint_body_mode,
+            )
+            attacker_body_mode = _as_body_mode(
+                ep.get("attacker_body_mode"),
+                name=f"endpoints[{idx}].attacker_body_mode",
+                default=victim_body_mode,
+            )
+            endpoint_content_type = _as_optional_non_empty_str(
+                ep.get("content_type"),
+                name=f"endpoints[{idx}].content_type",
+            )
+            victim_content_type = (
+                _as_optional_non_empty_str(
+                    ep.get("victim_content_type"),
+                    name=f"endpoints[{idx}].victim_content_type",
+                )
+                or endpoint_content_type
+            )
+            attacker_content_type = (
+                _as_optional_non_empty_str(
+                    ep.get("attacker_content_type"),
+                    name=f"endpoints[{idx}].attacker_content_type",
+                )
+                or victim_content_type
+            )
+            victim_payload = _prepare_payload(
+                headers=victim_headers,
+                body=victim_body,
+                body_mode=victim_body_mode,
+                content_type=victim_content_type,
+                name=f"endpoints[{idx}].victim",
+            )
+            attacker_payload = _prepare_payload(
+                headers=attacker_headers,
+                body=attacker_body,
+                body_mode=attacker_body_mode,
+                content_type=attacker_content_type,
+                name=f"endpoints[{idx}].attacker",
+            )
 
             victim_timeout = victim_timeout_default
             attacker_timeout = attacker_timeout_default
@@ -604,9 +752,10 @@ def run_test(
                 victim_session.request,
                 method,
                 url,
-                headers=victim_headers,
+                headers=victim_payload.headers,
                 cookies=(victim_request_cookies or None),
-                json_body=victim_body,
+                json_body=victim_payload.json_body,
+                data_body=victim_payload.data_body,
                 timeout=victim_timeout,
                 max_bytes=max_bytes,
                 verify_tls=victim_verify_tls,
@@ -620,9 +769,10 @@ def run_test(
                 attacker_session.request,
                 method,
                 url,
-                headers=attacker_headers,
+                headers=attacker_payload.headers,
                 cookies=(attacker_request_cookies or None),
-                json_body=attacker_body,
+                json_body=attacker_payload.json_body,
+                data_body=attacker_payload.data_body,
                 timeout=attacker_timeout,
                 max_bytes=max_bytes,
                 verify_tls=attacker_verify_tls,

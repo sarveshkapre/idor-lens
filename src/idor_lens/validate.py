@@ -6,6 +6,11 @@ from typing import Any, Mapping
 
 from .spec import find_unexpanded_env_vars, load_spec
 
+_BODY_MODE_JSON = "json"
+_BODY_MODE_FORM = "form"
+_BODY_MODE_RAW = "raw"
+_BODY_MODES = {_BODY_MODE_JSON, _BODY_MODE_FORM, _BODY_MODE_RAW}
+
 
 def _as_mapping(value: Any, *, name: str) -> Mapping[str, Any]:
     if not isinstance(value, dict):
@@ -83,6 +88,33 @@ def _require_int_list(value: Any, *, name: str) -> None:
             raise SystemExit(f"{name} must be a list of integers")
 
 
+def _require_body_mode(value: Any, *, name: str, default: str) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"{name} must be one of: json, form, raw")
+    normalized = value.lower()
+    if normalized not in _BODY_MODES:
+        raise SystemExit(f"{name} must be one of: json, form, raw")
+    return normalized
+
+
+def _require_body_for_mode(value: Any, *, body_mode: str, name: str) -> None:
+    if body_mode == _BODY_MODE_JSON:
+        return
+    if body_mode == _BODY_MODE_FORM:
+        if value is None:
+            return
+        if not isinstance(value, dict):
+            raise SystemExit(f"{name} must be a mapping when body_mode=form")
+        for key in value:
+            if not isinstance(key, str):
+                raise SystemExit(f"{name} must be a mapping with string keys when body_mode=form")
+        return
+    if value is not None and not isinstance(value, str):
+        raise SystemExit(f"{name} must be a string when body_mode=raw")
+
+
 def _validate_preflight(value: Any, *, name: str) -> None:
     if value is None:
         return
@@ -99,6 +131,16 @@ def _validate_preflight(value: Any, *, name: str) -> None:
         if timeout is not None:
             _require_positive_number(timeout, name=f"{step_name}.timeout")
         _require_string_map(step_map.get("headers"), name=f"{step_name}.headers")
+        _require_optional_non_empty_str(
+            step_map.get("content_type"), name=f"{step_name}.content_type"
+        )
+
+        body_mode = _require_body_mode(
+            step_map.get("body_mode"),
+            name=f"{step_name}.body_mode",
+            default=_BODY_MODE_JSON,
+        )
+        _require_body_for_mode(step_map.get("body"), body_mode=body_mode, name=f"{step_name}.body")
 
 
 def _validate_role(value: Any, *, name: str) -> Mapping[str, Any]:
@@ -143,6 +185,33 @@ def _validate_endpoint(value: Any, *, idx: int) -> None:
     _require_bool(endpoint.get("victim_follow_redirects"), name=f"{name}.victim_follow_redirects")
     _require_bool(
         endpoint.get("attacker_follow_redirects"), name=f"{name}.attacker_follow_redirects"
+    )
+    _require_optional_non_empty_str(endpoint.get("content_type"), name=f"{name}.content_type")
+    _require_optional_non_empty_str(
+        endpoint.get("victim_content_type"), name=f"{name}.victim_content_type"
+    )
+    _require_optional_non_empty_str(
+        endpoint.get("attacker_content_type"), name=f"{name}.attacker_content_type"
+    )
+
+    endpoint_body = endpoint.get("victim_body")
+    attacker_body = endpoint.get("attacker_body", endpoint_body)
+    endpoint_body_mode = _require_body_mode(
+        endpoint.get("body_mode"), name=f"{name}.body_mode", default=_BODY_MODE_JSON
+    )
+    victim_body_mode = _require_body_mode(
+        endpoint.get("victim_body_mode"),
+        name=f"{name}.victim_body_mode",
+        default=endpoint_body_mode,
+    )
+    attacker_body_mode = _require_body_mode(
+        endpoint.get("attacker_body_mode"),
+        name=f"{name}.attacker_body_mode",
+        default=victim_body_mode,
+    )
+    _require_body_for_mode(endpoint_body, body_mode=victim_body_mode, name=f"{name}.victim_body")
+    _require_body_for_mode(
+        attacker_body, body_mode=attacker_body_mode, name=f"{name}.attacker_body"
     )
 
 

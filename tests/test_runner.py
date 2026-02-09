@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from pytest import CaptureFixture
 
@@ -362,3 +363,140 @@ def test_endpoint_name_and_cookie_overrides_are_applied(
 
     data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
     assert data["name"] == "item read regression"
+
+
+def test_endpoint_form_body_mode_sends_data_with_content_type(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        seen.append(kwargs)
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - path: /forms/submit\n"
+        "    method: POST\n"
+        "    body_mode: form\n"
+        "    content_type: application/x-www-form-urlencoded\n"
+        "    victim_body:\n"
+        "      id: 123\n"
+        "    attacker_body:\n"
+        "      id: 999\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    assert len(seen) == 2
+    for call in seen:
+        assert call["json"] is None
+        assert call["data"] in ({"id": 123}, {"id": 999})
+        assert call["headers"]["Content-Type"] == "application/x-www-form-urlencoded"
+
+
+def test_endpoint_raw_body_mode_defaults_to_text_plain(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        seen.append(kwargs)
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - path: /raw\n"
+        "    method: POST\n"
+        "    body_mode: raw\n"
+        "    victim_body: '{\"id\":123}'\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    assert len(seen) == 2
+    for call in seen:
+        assert call["json"] is None
+        assert call["data"] == '{"id":123}'
+        assert call["headers"]["Content-Type"] == "text/plain; charset=utf-8"
+
+
+def test_preflight_body_mode_supports_form_and_raw(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    seen: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    def fake_request(*args: Any, **kwargs: Any) -> _Resp:
+        seen.append((args, kwargs))
+        return _Resp(200, b"ok")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n"
+        "  auth: Bearer victim\n"
+        "  preflight:\n"
+        "    - path: /victim/bootstrap\n"
+        "      method: POST\n"
+        "      body_mode: form\n"
+        "      body:\n"
+        "        csrf: victim\n"
+        "attacker:\n"
+        "  auth: Bearer attacker\n"
+        "  preflight:\n"
+        "    - path: /attacker/bootstrap\n"
+        "      method: POST\n"
+        "      body_mode: raw\n"
+        "      content_type: application/xml\n"
+        "      body: '<bootstrap role=\"attacker\"/>'\n"
+        "endpoints:\n"
+        "  - path: /items/123\n"
+        "    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    victim_preflight = next(
+        args_kwargs for args_kwargs in seen if args_kwargs[0][2].endswith("/victim/bootstrap")
+    )
+    attacker_preflight = next(
+        args_kwargs for args_kwargs in seen if args_kwargs[0][2].endswith("/attacker/bootstrap")
+    )
+    assert victim_preflight[1]["data"] == {"csrf": "victim"}
+    assert victim_preflight[1]["headers"]["Content-Type"] == "application/x-www-form-urlencoded"
+    assert attacker_preflight[1]["data"] == '<bootstrap role="attacker"/>'
+    assert attacker_preflight[1]["headers"]["Content-Type"] == "application/xml"
+
+
+def test_raw_body_mode_rejects_non_string_body(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "endpoints:\n"
+        "  - path: /items/123\n"
+        "    method: POST\n"
+        "    body_mode: raw\n"
+        "    victim_body:\n"
+        "      id: 123\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    with pytest.raises(SystemExit, match="endpoints\\[1\\]\\.victim\\.body must be a string"):
+        run_test(spec, out, timeout=1.0)
