@@ -1,0 +1,46 @@
+name: idor-lens-regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Replace with `pip install idor-lens` if using a released package.
+      - run: pip install "git+https://github.com/sarveshkapre/idor-lens@<PINNED_SHA>"
+
+      - name: Validate spec
+        run: python -m idor_lens validate --spec security/idor-spec.yml --require-env
+        env:
+          VICTIM_TOKEN: ${{ secrets.VICTIM_TOKEN }}
+          ATTACKER_TOKEN: ${{ secrets.ATTACKER_TOKEN }}
+
+      - name: Run scan
+        run: python -m idor_lens run --spec security/idor-spec.yml --out idor-current.jsonl
+        env:
+          VICTIM_TOKEN: ${{ secrets.VICTIM_TOKEN }}
+          ATTACKER_TOKEN: ${{ secrets.ATTACKER_TOKEN }}
+
+      - name: Compare baseline vs current (fail on new)
+        run: python -m idor_lens compare --baseline security/idor-baseline.jsonl --current idor-current.jsonl --fail-on-new
+
+      - name: Write SARIF
+        if: always()
+        run: python -m idor_lens sarif --in idor-current.jsonl --out idor-current.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: idor-current.sarif
+

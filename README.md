@@ -148,6 +148,8 @@ python -m idor_lens junit --in idor-report.jsonl --out idor-report.junit.xml
 python -m idor_lens sarif --in idor-report.jsonl --out idor-report.sarif
 ```
 
+For GitHub Actions templates (fail-on-vuln, regression compare, SARIF upload), see `docs/ci-github-actions.md`.
+
 ## Regression compare
 
 Compare a baseline run to a new run and fail CI only when *new* vulnerabilities appear:

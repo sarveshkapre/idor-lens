@@ -63,7 +63,7 @@ python -m idor_lens --help
 ## Next (tight scope)
 
 - Add auth token rotation helpers for expiring credentials during long scans.
-- Add optional GitHub Actions workflow examples for CI/regression mode.
+- Improve strict matching to handle dynamic fields (e.g. ignore selected JSON paths).
 
 ## Non-goals (near-term)
 

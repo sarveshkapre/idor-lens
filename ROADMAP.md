@@ -7,5 +7,4 @@
 ## Next
 
 - Auth token rotation helpers.
-- Optional CI workflow examples (GitHub Actions) for baseline compare + security ingestion.
 - Lightweight endpoint batching/parallelism with rate-limit-aware controls.

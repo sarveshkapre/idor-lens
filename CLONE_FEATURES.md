@@ -7,8 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P1 (Selected): Add first-class CI workflow examples (GitHub Actions) using `--fail-on-vuln`, compare baseline mode, and SARIF upload.
-  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
 - [ ] P1: Improve response diffing: allow ignoring dynamic fields (e.g. timestamps) for strict matching via `json_ignore_paths`.
   - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=low.
 - [ ] P2: Add auth token rotation helpers for expiring credentials during long scans.
@@ -23,6 +21,8 @@
   - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=medium.
 
 ## Implemented
+- [x] 2026-02-09: Added GitHub Actions CI workflow examples (fail-on-vuln, regression compare, SARIF upload).
+  Evidence: `docs/ci-github-actions.md`, `examples/github-actions/idor-lens-regression.yml`, `README.md`; gate: `make check`.
 - [x] 2026-02-09: Added configurable deny-response heuristics via `deny_contains` / `deny_regex` (spec-level + per-endpoint).
   Evidence: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/template.py`, `src/idor_lens/report.py`, `tests/test_runner.py`, `tests/test_validate.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Added SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboard ingestion.

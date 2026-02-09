@@ -8,6 +8,7 @@
 - Extended `idor-lens validate` to fail fast on payload mode/body mismatches.
 - Added SARIF export (`idor-lens sarif`) for security dashboard ingestion.
 - Added configurable deny heuristics via `deny_contains` / `deny_regex` for targets that return 2xx on access denial.
+- Added GitHub Actions CI workflow examples (fail-on-vuln, regression compare, SARIF upload).
 
 ## Verification evidence
 
