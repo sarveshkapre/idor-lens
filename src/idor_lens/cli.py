@@ -40,6 +40,12 @@ def main(argv: list[str] | None = None) -> int:
         "--max-bytes", type=int, default=1024 * 1024, help="Max bytes hashed per response"
     )
     p_run.add_argument(
+        "--max-response-bytes",
+        type=int,
+        default=0,
+        help="Hard cap for response bytes read (0 = unlimited). Useful for huge/streaming endpoints.",
+    )
+    p_run.add_argument(
         "--strict-body-match",
         action="store_true",
         help="Only flag vulnerability when attacker response body matches victim (best-effort)",
@@ -111,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
     p_replay.add_argument("--timeout", type=float, default=10.0)
     p_replay.add_argument(
         "--max-bytes", type=int, default=1024 * 1024, help="Max bytes hashed per response"
+    )
+    p_replay.add_argument(
+        "--max-response-bytes",
+        type=int,
+        default=0,
+        help="Hard cap for response bytes read (0 = unlimited). Useful for huge/streaming endpoints.",
     )
     p_replay.add_argument(
         "--strict-body-match",
@@ -269,6 +281,7 @@ def _run(args: argparse.Namespace) -> int:
         strict_body_match=bool(args.strict_body_match),
         fail_on_vuln=bool(args.fail_on_vuln),
         max_bytes=int(args.max_bytes),
+        max_response_bytes=(int(args.max_response_bytes) or None),
         only_names=(list(args.only_name) if args.only_name else None),
         only_paths=(list(args.only_path) if args.only_path else None),
         verify_tls=(False if bool(args.insecure) else None),
@@ -345,6 +358,7 @@ def _replay(args: argparse.Namespace) -> int:
             strict_body_match=bool(args.strict_body_match),
             fail_on_vuln=False,
             max_bytes=int(args.max_bytes),
+            max_response_bytes=(int(args.max_response_bytes) or None),
             verify_tls=(False if bool(args.insecure) else None),
             proxy=(str(args.proxy) if args.proxy is not None else None),
             follow_redirects=(

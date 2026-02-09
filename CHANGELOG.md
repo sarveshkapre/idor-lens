@@ -8,6 +8,7 @@
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
 - `idor-lens replay` replays a single endpoint from a spec (victim vs attacker) for debugging.
 - `idor-lens run --only-name/--only-path` filters to run a subset of endpoints for faster iteration.
+- `idor-lens run --max-response-bytes` to cap response reads (prevents hanging on huge/streaming endpoints).
 - `idor-lens junit` writes JUnit XML from JSONL output (CI ingestion).
 - `idor-lens sarif` writes SARIF 2.1.0 from JSONL output (security dashboard ingestion).
 - `idor-lens init` writes a starter YAML spec.

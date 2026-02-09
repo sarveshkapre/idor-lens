@@ -134,6 +134,43 @@ def test_only_filters_require_match(tmp_path: Path, monkeypatch: MonkeyPatch) ->
         run_test(spec, out, timeout=1.0, only_names=["does-not-exist"])
 
 
+def test_max_response_bytes_caps_reads(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    class _StreamResp:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+
+        def iter_content(self, *, chunk_size: int = 8192) -> Any:
+            _ = chunk_size
+            # 10KB total if fully read.
+            for _i in range(10):
+                yield b"a" * 1024
+
+        def close(self) -> None:
+            return
+
+    def fake_request(*_args: Any, **_kwargs: Any) -> _StreamResp:
+        return _StreamResp(200)
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, max_response_bytes=1500)
+
+    row = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert row["victim_bytes"] == 1500
+    assert row["attacker_bytes"] == 1500
+    assert row["victim_response_capped"] is True
+    assert row["attacker_response_capped"] is True
+
+
 def test_strict_body_match_requires_equal_bodies(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
         auth = (kwargs.get("headers") or {}).get("Authorization")

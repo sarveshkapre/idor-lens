@@ -36,6 +36,8 @@ class ReportRow:
     attacker_error: str | None
     victim_deny_match: bool | None
     attacker_deny_match: bool | None
+    victim_response_capped: bool | None
+    attacker_response_capped: bool | None
 
 
 def _as_bool(value: Any, *, default: bool = False) -> bool:
@@ -110,6 +112,12 @@ def _to_report_row(d: dict[str, Any]) -> ReportRow:
         else None,
         attacker_deny_match=d.get("attacker_deny_match")
         if isinstance(d.get("attacker_deny_match"), bool)
+        else None,
+        victim_response_capped=d.get("victim_response_capped")
+        if isinstance(d.get("victim_response_capped"), bool)
+        else None,
+        attacker_response_capped=d.get("attacker_response_capped")
+        if isinstance(d.get("attacker_response_capped"), bool)
         else None,
     )
 
@@ -209,6 +217,14 @@ def _render_html(
         if r.attacker_deny_match is not None:
             details_bits.append(
                 f"<div><span class='k'>Attacker deny match</span> {str(r.attacker_deny_match).lower()}</div>"
+            )
+        if r.victim_response_capped is not None:
+            details_bits.append(
+                f"<div><span class='k'>Victim response capped</span> {str(r.victim_response_capped).lower()}</div>"
+            )
+        if r.attacker_response_capped is not None:
+            details_bits.append(
+                f"<div><span class='k'>Attacker response capped</span> {str(r.attacker_response_capped).lower()}</div>"
             )
 
         details_html = ""

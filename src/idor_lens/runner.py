@@ -63,6 +63,8 @@ class Finding:
     attacker_error: str | None
     victim_deny_match: bool
     attacker_deny_match: bool
+    victim_response_capped: bool
+    attacker_response_capped: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -91,6 +93,8 @@ class Finding:
             "attacker_error": self.attacker_error,
             "victim_deny_match": self.victim_deny_match,
             "attacker_deny_match": self.attacker_deny_match,
+            "victim_response_capped": self.victim_response_capped,
+            "attacker_response_capped": self.attacker_response_capped,
         }
 
 
@@ -255,6 +259,7 @@ class _Proof:
     error: str | None
     attempts: int
     deny_match: bool
+    response_capped: bool
 
 
 @dataclass(frozen=True)
@@ -326,6 +331,7 @@ def _request_with_proof(
     data_body: Any,
     timeout: float,
     max_bytes: int,
+    max_response_bytes: int | None,
     verify_tls: bool,
     proxy: str | None,
     follow_redirects: bool,
@@ -338,18 +344,29 @@ def _request_with_proof(
     start = time.time()
     proxies = _proxies(proxy)
 
-    def _read_body_streaming(resp: Any, *, max_bytes: int) -> tuple[int, bytes]:
+    def _read_body_streaming(
+        resp: Any, *, max_bytes: int, max_response_bytes: int | None
+    ) -> tuple[int, bytes, bool]:
         # Prefer streaming reads to avoid buffering large bodies in memory.
         iter_content = getattr(resp, "iter_content", None)
         if callable(iter_content):
             sample_parts: list[bytes] = []
             sample_len = 0
             total = 0
+            capped = False
             try:
                 for chunk in iter_content(chunk_size=8192):
                     if not chunk:
                         continue
                     b = bytes(chunk)
+                    if max_response_bytes is not None:
+                        remaining = max_response_bytes - total
+                        if remaining <= 0:
+                            capped = True
+                            break
+                        if len(b) > remaining:
+                            b = b[:remaining]
+                            capped = True
                     total += len(b)
                     if sample_len < max_bytes:
                         take = b[: max_bytes - sample_len]
@@ -360,13 +377,17 @@ def _request_with_proof(
                 close = getattr(resp, "close", None)
                 if callable(close):
                     close()
-            return total, b"".join(sample_parts)
+            return total, b"".join(sample_parts), capped
 
         body = getattr(resp, "content", b"") or b""
         if not isinstance(body, (bytes, bytearray)):
             body = str(body).encode("utf-8", errors="replace")
         body_bytes = bytes(body)
-        return len(body_bytes), body_bytes[:max_bytes]
+        capped = False
+        if max_response_bytes is not None and len(body_bytes) > max_response_bytes:
+            body_bytes = body_bytes[:max_response_bytes]
+            capped = True
+        return len(body_bytes), body_bytes[:max_bytes], capped
 
     last_error: str | None = None
     last_status = 0
@@ -374,6 +395,7 @@ def _request_with_proof(
     last_num_bytes = 0
     deny_match = False
     attempts_used = 0
+    response_capped = False
 
     max_attempts = retries + 1
     for attempt in range(1, max_attempts + 1):
@@ -393,7 +415,9 @@ def _request_with_proof(
                 stream=True,
             )
             last_status = int(getattr(resp, "status_code", 0))
-            last_num_bytes, last_sample = _read_body_streaming(resp, max_bytes=max_bytes)
+            last_num_bytes, last_sample, response_capped = _read_body_streaming(
+                resp, max_bytes=max_bytes, max_response_bytes=max_response_bytes
+            )
             last_error = None
             deny_match = False
 
@@ -443,6 +467,7 @@ def _request_with_proof(
         error=last_error,
         attempts=attempts_used,
         deny_match=deny_match,
+        response_capped=response_capped,
     )
 
 
@@ -468,6 +493,7 @@ def _run_preflight(
     preflight: Any,
     timeout: float,
     max_bytes: int,
+    max_response_bytes: int | None,
     verify_tls: bool,
     proxy: str | None,
     follow_redirects: bool,
@@ -529,6 +555,7 @@ def _run_preflight(
             data_body=payload.data_body,
             timeout=float(step_timeout),
             max_bytes=max_bytes,
+            max_response_bytes=max_response_bytes,
             verify_tls=verify_tls,
             proxy=proxy,
             follow_redirects=follow_redirects,
@@ -552,6 +579,7 @@ def run_test(
     strict_body_match: bool = False,
     fail_on_vuln: bool = False,
     max_bytes: int = _DEFAULT_MAX_BYTES,
+    max_response_bytes: int | None = None,
     only_names: list[str] | None = None,
     only_paths: list[str] | None = None,
     verify_tls: bool | None = None,
@@ -581,6 +609,8 @@ def run_test(
 
     if max_bytes <= 0:
         raise SystemExit("--max-bytes must be > 0")
+    if max_response_bytes is not None and max_response_bytes <= 0:
+        raise SystemExit("--max-response-bytes must be > 0")
 
     only_name_set: set[str] = set()
     only_path_set: set[str] = set()
@@ -734,6 +764,7 @@ def run_test(
         preflight=victim.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
+        max_response_bytes=max_response_bytes,
         verify_tls=victim_verify_tls,
         proxy=victim_proxy,
         follow_redirects=victim_follow_redirects,
@@ -752,6 +783,7 @@ def run_test(
         preflight=attacker.get("preflight"),
         timeout=timeout,
         max_bytes=max_bytes,
+        max_response_bytes=max_response_bytes,
         verify_tls=attacker_verify_tls,
         proxy=attacker_proxy,
         follow_redirects=attacker_follow_redirects,
@@ -949,6 +981,7 @@ def run_test(
                 data_body=victim_payload.data_body,
                 timeout=victim_timeout,
                 max_bytes=max_bytes,
+                max_response_bytes=max_response_bytes,
                 verify_tls=victim_verify_tls,
                 proxy=victim_proxy,
                 follow_redirects=victim_ep_follow_redirects,
@@ -968,6 +1001,7 @@ def run_test(
                 data_body=attacker_payload.data_body,
                 timeout=attacker_timeout,
                 max_bytes=max_bytes,
+                max_response_bytes=max_response_bytes,
                 verify_tls=attacker_verify_tls,
                 proxy=attacker_proxy,
                 follow_redirects=attacker_ep_follow_redirects,
@@ -987,14 +1021,22 @@ def run_test(
                 v.num_bytes == 0
                 and a.num_bytes == 0
                 and not (v.truncated or a.truncated)
+                and not (v.response_capped or a.response_capped)
                 and not (v.error or a.error)
             ) or (
                 v.sha256 is not None
                 and v.sha256 == a.sha256
                 and v.num_bytes == a.num_bytes
                 and not (v.truncated or a.truncated)
+                and not (v.response_capped or a.response_capped)
             )
-            if json_ignore_paths and not (v.truncated or a.truncated) and v.sample and a.sample:
+            if (
+                json_ignore_paths
+                and not (v.truncated or a.truncated)
+                and not (v.response_capped or a.response_capped)
+                and v.sample
+                and a.sample
+            ):
                 json_match = _json_body_match(v.sample, a.sample, json_ignore_paths)
                 if json_match is not None:
                     body_match = json_match
@@ -1022,6 +1064,8 @@ def run_test(
                 reason = "attacker denied"
             elif a.deny_match:
                 reason = "attacker denied (deny heuristics)"
+            elif strict_body_match and (v.response_capped or a.response_capped):
+                reason = "response capped; strict body match cannot assess"
             elif strict_body_match and not body_match:
                 reason = "attacker 2xx but response body differs (strict mode)"
             elif body_match:
@@ -1059,6 +1103,8 @@ def run_test(
                 attacker_error=a.error,
                 victim_deny_match=bool(v.deny_match),
                 attacker_deny_match=bool(a.deny_match),
+                victim_response_capped=bool(v.response_capped),
+                attacker_response_capped=bool(a.response_capped),
             )
             out.write(json.dumps(finding.to_dict()) + "\n")
 

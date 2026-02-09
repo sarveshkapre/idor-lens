@@ -31,6 +31,8 @@
 ## Implemented
 - [x] 2026-02-09: Added `idor-lens run --only-name/--only-path` filters to run a subset of endpoints for faster iteration.
   Evidence: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`, `tests/test_runner.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
+- [x] 2026-02-09: Added `--max-response-bytes` to cap response reads (prevents hanging on huge/streaming endpoints); surfaced in JSONL and HTML report details.
+  Evidence: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`, `src/idor_lens/report.py`, `tests/test_runner.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Streamed response reads in runner (hash/sample up to `--max-bytes` without buffering full bodies).
   Evidence: `src/idor_lens/runner.py`, `tests/test_runner.py`; gate: `make check`.
 - [x] 2026-02-09: Added `auth_file` support for rotating `Authorization` header tokens during long scans (read per request).

@@ -24,6 +24,18 @@
 - Confidence: high
 - Trust label: verified-local
 
+## 2026-02-09 - max-response-bytes Hard Cap
+
+- Decision: Add `--max-response-bytes` to stop reading responses after N bytes, and record cap hits in output (`victim_response_capped` / `attacker_response_capped`).
+- Why: Prevent scans from hanging or consuming excessive bandwidth/memory on huge or streaming endpoints, while keeping status/heuristic checks usable.
+- Evidence:
+  - Implementation: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`, `src/idor_lens/report.py`
+  - Tests: `tests/test_runner.py`
+  - Verification: `make check` (pass)
+- Commit: TBD
+- Confidence: medium-high
+- Trust label: verified-local
+
 ## 2026-02-09 - auth_file Token Rotation Helper
 
 - Decision: Add `victim/attacker.auth_file` to read the full `Authorization` header value from a file per request; enforce mutual exclusivity with `auth`.
