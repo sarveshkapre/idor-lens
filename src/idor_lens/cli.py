@@ -13,7 +13,6 @@ from .junit import write_junit_report
 from .report import write_html_report
 from .runner import run_test
 from .sarif import write_sarif_report
-from .spec import load_spec
 from .summarize import summarize_jsonl, write_summary
 from .template import SpecTemplateOptions, render_spec_template
 from .validate import validate_spec
@@ -281,7 +280,11 @@ def _report(args: argparse.Namespace) -> int:
 
 def _replay(args: argparse.Namespace) -> int:
     spec_path = Path(args.spec)
-    spec = load_spec(spec_path)
+    # Intentionally load the raw YAML (no env expansion) to avoid writing expanded secrets
+    # to the temporary narrowed spec file.
+    spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    if not isinstance(spec, dict):
+        raise SystemExit("spec must be a YAML mapping")
     endpoints = spec.get("endpoints", [])
     if not isinstance(endpoints, list) or not endpoints:
         raise SystemExit("spec must include endpoints list")
