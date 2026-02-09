@@ -7,20 +7,22 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P1: Improve response diffing: allow ignoring dynamic fields (e.g. timestamps) for strict matching via `json_ignore_paths`.
-  - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=low.
 - [ ] P2: Add auth token rotation helpers for expiring credentials during long scans.
   - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=low.
+- [ ] P2: Add a `idor-lens replay` utility that replays a single endpoint with victim/attacker for interactive debugging.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=low, confidence=medium.
 - [ ] P2: Add lightweight endpoint batching/parallelism with rate-limit-aware controls (max in-flight, 429 backoff).
   - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
 - [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
   - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=low.
-- [ ] P3: Add a `idor-lens replay` utility that replays a single endpoint with victim/attacker for interactive debugging.
-  - Score: impact=low, effort=medium, fit=medium, differentiation=low, risk=low, confidence=low.
-- [ ] P3: Add a small "spec cookbook" doc with patterns: CSRF preflight, cookie auth, proxying via Burp, deny heuristics, and strict-body tuning.
-  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=medium.
+- [ ] P3: Stream response hashing (read up to `--max-bytes` without buffering entire bodies) to reduce memory use on large endpoints.
+  - Score: impact=medium, effort=high, fit=medium, differentiation=low, risk=medium, confidence=low.
 
 ## Implemented
+- [x] 2026-02-09: Improved response diffing: allow ignoring dynamic fields (e.g. timestamps) for strict matching via `json_ignore_paths`.
+  Evidence: `src/idor_lens/json_paths.py`, `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/template.py`, `tests/test_runner.py`, `tests/test_validate.py`, `tests/test_smoke.py`, `README.md`, `PLAN.md`, `CHANGELOG.md`; gate: `make check`.
+- [x] 2026-02-09: Added a small "spec cookbook" doc with patterns: CSRF preflight, cookie auth, proxying via Burp, deny heuristics, and strict-body tuning.
+  Evidence: `docs/spec-cookbook.md`, `README.md`; gate: `make check`.
 - [x] 2026-02-09: Added GitHub Actions CI workflow examples (fail-on-vuln, regression compare, SARIF upload).
   Evidence: `docs/ci-github-actions.md`, `examples/github-actions/idor-lens-regression.yml`, `README.md`; gate: `make check`.
 - [x] 2026-02-09: Added configurable deny-response heuristics via `deny_contains` / `deny_regex` (spec-level + per-endpoint).
@@ -59,6 +61,8 @@
     - https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f (Autorize)
   - PortSwigger Web Security Academy guidance: Insecure direct object references (IDOR).
     - https://portswigger.net/web-security/access-control/idor
+  - OWASP API Security Top 10: API1:2023 Broken Object Level Authorization (BOLA), the API-world equivalent of IDOR.
+    - https://owasp.org/API-Security/editions/2023/en/0x11-t10/
   - SARIF 2.1.0 is a common interchange format for ingesting scan results (e.g. GitHub code scanning).
     - https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 

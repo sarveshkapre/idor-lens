@@ -1,5 +1,21 @@
 # PROJECT_MEMORY
 
+## 2026-02-09 - JSON Ignore Paths For Strict Matching
+
+- Decision: Add `json_ignore_paths` (spec-level + per-endpoint) to ignore known-dynamic JSON fields when using `--strict-body-match`, plus treat empty response bodies as a match.
+- Why: Strict body matching reduces false positives, but it becomes unusable on JSON APIs that include timestamps/request IDs. Empty 2xx bodies (e.g. 204) should also be comparable in strict mode.
+- Evidence:
+  - Implementation: `src/idor_lens/json_paths.py`, `src/idor_lens/runner.py`
+  - Validation: `src/idor_lens/validate.py`
+  - Docs: `README.md`, `PLAN.md`, `CHANGELOG.md`, `src/idor_lens/template.py`
+  - Tests: `tests/test_runner.py`, `tests/test_validate.py`
+  - Verification: `make check` (pass, includes `tests/test_smoke.py::test_cli_run_with_json_ignore_paths_smoke`)
+- Commit: `daa89e4`
+- Confidence: high
+- Trust label: verified-local
+- Follow-ups:
+  - Consider streaming body reads to avoid buffering large responses when `--max-bytes` is small.
+
 ## 2026-02-09 - Payload Mode Compatibility
 
 - Decision: Add endpoint and preflight payload-mode support via `body_mode` (`json`, `form`, `raw`) with endpoint role overrides (`victim_body_mode`, `attacker_body_mode`) and optional payload `content_type` controls.

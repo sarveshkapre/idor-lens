@@ -1,0 +1,137 @@
+# Spec Cookbook
+
+Copy/paste patterns for writing effective IDOR Lens specs.
+
+## Secrets Via Env Vars
+
+Keep tokens and session secrets out of `spec.yml`:
+
+```yaml
+victim:
+  auth: Bearer ${VICTIM_TOKEN}
+attacker:
+  auth: Bearer ${ATTACKER_TOKEN}
+```
+
+Use `idor-lens validate --require-env` in CI to fail fast if variables are missing.
+
+## Cookie Auth And Bootstrap (Preflight)
+
+If your app needs cookies, CSRF, or a bootstrap request before protected endpoints behave normally:
+
+```yaml
+victim:
+  cookies:
+    session: ${VICTIM_SESSION}
+  preflight:
+    - path: /bootstrap
+      method: GET
+attacker:
+  cookies:
+    session: ${ATTACKER_SESSION}
+  preflight:
+    - path: /bootstrap
+      method: GET
+```
+
+Preflight runs once per role using a persistent cookie jar, before endpoints are tested.
+
+## CSRF Preflight With Form Payload
+
+```yaml
+victim:
+  preflight:
+    - path: /csrf
+      method: POST
+      body_mode: form
+      body:
+        seed: "1"
+```
+
+## Proxy Through Burp Or mitmproxy
+
+```yaml
+proxy: http://127.0.0.1:8080
+```
+
+Or pass it on the command line:
+
+```bash
+python -m idor_lens run --spec spec.yml --proxy http://127.0.0.1:8080
+```
+
+## Non-JSON Request Bodies
+
+Form payload:
+
+```yaml
+endpoints:
+  - name: item-update
+    path: /items/123
+    method: POST
+    body_mode: form
+    victim_body:
+      id: 123
+    attacker_body:
+      id: 123
+```
+
+Raw payload:
+
+```yaml
+endpoints:
+  - name: item-update-raw
+    path: /items/123
+    method: POST
+    body_mode: raw
+    content_type: application/json
+    victim_body: '{"id":123}'
+    attacker_body: '{"id":123}'
+```
+
+## Deny Heuristics For 2xx Denial Pages
+
+Some targets return a 2xx "access denied" page. Use deny heuristics to avoid status-only false positives:
+
+```yaml
+deny_contains:
+  - access denied
+deny_regex:
+  - "(?i)not authorized"
+```
+
+You can also set these per endpoint.
+
+## Strict Body Matching With Dynamic JSON Fields
+
+Use `--strict-body-match` to only flag a vulnerability when the attacker response body matches the victim response body.
+
+For JSON responses that include known-dynamic fields (timestamps, request IDs), ignore them:
+
+```yaml
+json_ignore_paths:
+  - /updatedAt
+  - /requestId
+  - /items/*/updatedAt
+```
+
+Path formats:
+- JSON pointer: `"/a/b/0"`
+- Dot + brackets: `"a.b[0]"`, `"items[*].updatedAt"`
+
+## Retries, Backoff, And Timeouts
+
+```yaml
+retries: 2
+retry_backoff_s: 0.25
+
+victim:
+  timeout: 10
+attacker:
+  timeout: 10
+
+endpoints:
+  - path: /items/123
+    timeout: 15
+```
+

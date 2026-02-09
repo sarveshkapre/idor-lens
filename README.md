@@ -96,6 +96,7 @@ json_ignore_paths:
   - /items/*/updatedAt
 ```
 - For apps that return a 2xx "access denied" page, use `deny_contains` / `deny_regex` in your spec to override status-only signals.
+- For more spec patterns (cookies/CSRF, proxying, strict matching tuning), see `docs/spec-cookbook.md`.
 
 ### Request body modes (`json`, `form`, `raw`)
 
