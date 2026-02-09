@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from .json_paths import parse_ignore_path
 from .spec import find_unexpanded_env_vars, load_spec
 
 _BODY_MODE_JSON = "json"
@@ -109,6 +110,18 @@ def _require_regex_list(value: Any, *, name: str) -> None:
             re.compile(pat)
         except re.error as exc:
             raise SystemExit(f"{name}[{idx}] is not a valid regex: {exc}") from exc
+
+
+def _require_json_ignore_paths(value: Any, *, name: str) -> None:
+    if value is None:
+        return
+    _require_string_list(value, name=name)
+    assert isinstance(value, list)
+    for idx, p in enumerate(value, start=1):
+        try:
+            parse_ignore_path(p)
+        except ValueError as exc:
+            raise SystemExit(f"{name}[{idx}] is not a valid ignore path: {exc}") from exc
 
 
 def _require_body_mode(value: Any, *, name: str, default: str) -> str:
@@ -218,6 +231,7 @@ def _validate_endpoint(value: Any, *, idx: int) -> None:
     )
     _require_string_list(endpoint.get("deny_contains"), name=f"{name}.deny_contains")
     _require_regex_list(endpoint.get("deny_regex"), name=f"{name}.deny_regex")
+    _require_json_ignore_paths(endpoint.get("json_ignore_paths"), name=f"{name}.json_ignore_paths")
 
     endpoint_body = endpoint.get("victim_body")
     attacker_body = endpoint.get("attacker_body", endpoint_body)
@@ -257,6 +271,7 @@ def validate_spec(spec_path: Path, *, require_env: bool) -> int:
     _require_int_list(spec.get("retry_statuses"), name="retry_statuses")
     _require_string_list(spec.get("deny_contains"), name="deny_contains")
     _require_regex_list(spec.get("deny_regex"), name="deny_regex")
+    _require_json_ignore_paths(spec.get("json_ignore_paths"), name="json_ignore_paths")
 
     _validate_role(spec.get("victim", {}), name="victim")
     _validate_role(spec.get("attacker", {}), name="attacker")

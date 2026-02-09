@@ -87,6 +87,14 @@ Tips:
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
 - Use `--strict-body-match` to reduce false positives when attacker gets a different 2xx body.
+- For strict matching on JSON APIs with dynamic fields (timestamps, request IDs), add `json_ignore_paths` to the spec (best-effort):
+
+```yaml
+json_ignore_paths:
+  - /updatedAt
+  - /requestId
+  - /items/*/updatedAt
+```
 - For apps that return a 2xx "access denied" page, use `deny_contains` / `deny_regex` in your spec to override status-only signals.
 
 ### Request body modes (`json`, `form`, `raw`)

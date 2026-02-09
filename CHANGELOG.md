@@ -19,6 +19,7 @@
 - `idor-lens validate` now checks run-critical schema fields (timeouts, retries, headers/cookies maps, preflight shape).
 - `idor-lens validate` now enforces payload-mode schema rules (mode values and body type compatibility).
 - Configurable deny-response heuristics via `deny_contains` / `deny_regex` (spec-level + per-endpoint).
+- `json_ignore_paths` to ignore known-dynamic JSON fields for strict body matching (best-effort).
 - JSONL readers now report source + line/column for malformed rows.
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).

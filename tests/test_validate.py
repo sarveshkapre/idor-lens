@@ -11,6 +11,8 @@ def test_validate_ok(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yml"
     spec.write_text(
         "base_url: https://example.test\n"
+        "json_ignore_paths:\n"
+        "  - /updatedAt\n"
         "victim:\n  auth: Bearer x\n"
         "attacker:\n  auth: Bearer y\n"
         "endpoints:\n  - path: /items/123\n    method: GET\n",
@@ -155,6 +157,20 @@ def test_validate_rejects_non_list_deny_contains(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(SystemExit, match="deny_contains must be a list of strings"):
+        validate_spec(spec, require_env=True)
+
+
+def test_validate_rejects_invalid_json_ignore_path(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "json_ignore_paths:\n"
+        "  - /items//updatedAt\n"
+        "endpoints:\n"
+        "  - path: /items/123\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="json_ignore_paths\\[1\\] is not a valid ignore path"):
         validate_spec(spec, require_env=True)
 
 

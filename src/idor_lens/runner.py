@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from .json_paths import apply_ignore_paths
 from .spec import load_spec
 
 
@@ -211,6 +212,38 @@ def _proxies(proxy: str | None) -> dict[str, str] | None:
     return {"http": p, "https": p}
 
 
+def _json_body_match(
+    victim_sample: bytes, attacker_sample: bytes, ignore_paths: list[str]
+) -> bool | None:
+    v_norm = _normalize_json_sample(victim_sample, ignore_paths)
+    if v_norm is None:
+        return None
+    a_norm = _normalize_json_sample(attacker_sample, ignore_paths)
+    if a_norm is None:
+        return None
+    return v_norm == a_norm
+
+
+def _normalize_json_sample(sample: bytes, ignore_paths: list[str]) -> str | None:
+    # Best-effort: only attempt if it "looks like" JSON.
+    stripped = sample.lstrip()
+    if not stripped or stripped[:1] not in (b"{", b"["):
+        return None
+
+    try:
+        obj = json.loads(sample.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return None
+
+    try:
+        apply_ignore_paths(obj, ignore_paths)
+    except ValueError as exc:
+        raise SystemExit(f"invalid json_ignore_paths entry: {exc}") from exc
+
+    # Canonicalize for stable comparisons across whitespace/key order.
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class _Proof:
     status: int
@@ -218,6 +251,7 @@ class _Proof:
     num_bytes: int
     sha256: str | None
     truncated: bool
+    sample: bytes
     error: str | None
     attempts: int
     deny_match: bool
@@ -306,7 +340,8 @@ def _request_with_proof(
 
     last_error: str | None = None
     last_status = 0
-    last_body: bytes = b""
+    last_sample: bytes = b""
+    last_num_bytes = 0
     deny_match = False
     attempts_used = 0
 
@@ -330,14 +365,15 @@ def _request_with_proof(
             body = getattr(resp, "content", b"") or b""
             if not isinstance(body, (bytes, bytearray)):
                 body = str(body).encode("utf-8", errors="replace")
-            last_body = bytes(body)
+            body_bytes = bytes(body)
+            last_num_bytes = len(body_bytes)
+            last_sample = body_bytes[:max_bytes]
             last_error = None
             deny_match = False
 
-            if (deny_contains or deny_regexes) and last_body:
+            if (deny_contains or deny_regexes) and last_sample:
                 # Only examine the first max_bytes since we already hash at most that much.
-                sample = last_body[:max_bytes]
-                text = sample.decode("utf-8", errors="replace")
+                text = last_sample.decode("utf-8", errors="replace")
                 lower = text.lower()
                 for needle in deny_contains:
                     if needle.lower() in lower:
@@ -367,9 +403,9 @@ def _request_with_proof(
             break
 
     elapsed_ms = int((time.time() - start) * 1000)
-    num_bytes = len(last_body)
+    num_bytes = last_num_bytes
     truncated = num_bytes > max_bytes
-    digest = hashlib.sha256(last_body[:max_bytes]).hexdigest() if num_bytes else None
+    digest = hashlib.sha256(last_sample).hexdigest() if num_bytes else None
 
     return _Proof(
         status=last_status,
@@ -377,6 +413,7 @@ def _request_with_proof(
         num_bytes=num_bytes,
         sha256=digest,
         truncated=truncated,
+        sample=last_sample,
         error=last_error,
         attempts=attempts_used,
         deny_match=deny_match,
@@ -550,6 +587,7 @@ def run_test(
 
     spec_deny_contains = _as_str_list(spec.get("deny_contains"), name="deny_contains")
     spec_deny_regexes = _as_regex_list(spec.get("deny_regex"), name="deny_regex")
+    spec_json_ignore_paths = _as_str_list(spec.get("json_ignore_paths"), name="json_ignore_paths")
 
     victim_token = victim.get("auth")
     attacker_token = attacker.get("auth")
@@ -809,6 +847,10 @@ def run_test(
             )
             deny_contains = [*spec_deny_contains, *ep_deny_contains]
             deny_regexes = [*spec_deny_regexes, *ep_deny_regexes]
+            ep_json_ignore_paths = _as_str_list(
+                ep.get("json_ignore_paths"), name=f"endpoints[{idx}].json_ignore_paths"
+            )
+            json_ignore_paths = [*spec_json_ignore_paths, *ep_json_ignore_paths]
 
             url = urljoin(base_url, path)
             start_total = time.time()
@@ -857,11 +899,20 @@ def run_test(
             victim_ok = victim_2xx and not v.deny_match
             attacker_ok = attacker_2xx and not a.deny_match
             body_match = (
+                v.num_bytes == 0
+                and a.num_bytes == 0
+                and not (v.truncated or a.truncated)
+                and not (v.error or a.error)
+            ) or (
                 v.sha256 is not None
                 and v.sha256 == a.sha256
                 and v.num_bytes == a.num_bytes
                 and not (v.truncated or a.truncated)
             )
+            if json_ignore_paths and not (v.truncated or a.truncated) and v.sample and a.sample:
+                json_match = _json_body_match(v.sample, a.sample, json_ignore_paths)
+                if json_match is not None:
+                    body_match = json_match
 
             vulnerable_by_status = victim_ok and attacker_ok
             vulnerable = vulnerable_by_status and (body_match if strict_body_match else True)

@@ -70,6 +70,59 @@ def test_strict_body_match_requires_equal_bodies(tmp_path: Path, monkeypatch: Mo
     assert data["body_match"] is False
 
 
+def test_strict_body_match_supports_json_ignore_paths(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        if auth == "Bearer victim":
+            return _Resp(200, b'{"id":123,"updatedAt":"2026-02-09T00:00:01Z","secret":"S"}')
+        return _Resp(200, b'{"secret":"S","updatedAt":"2026-02-09T00:00:02Z","id":123}')
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "json_ignore_paths:\n"
+        "  - /updatedAt\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, strict_body_match=True)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["vulnerable"] is True
+    assert data["body_match"] is True
+
+
+def test_strict_body_match_treats_empty_bodies_as_match(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        return _Resp(204, b"")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, strict_body_match=True)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["vulnerable"] is True
+    assert data["body_match"] is True
+
+
 def test_preflight_and_cookies_are_supported(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     seen: list[dict[str, Any]] = []
 

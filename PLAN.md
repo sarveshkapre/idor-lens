@@ -59,11 +59,11 @@ python -m idor_lens --help
 - Extended `idor-lens validate` to catch payload mode/body mismatch errors before scans run.
 - Added SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboard ingestion.
 - Added configurable deny-response heuristics via `deny_contains` / `deny_regex` to reduce false positives on noisy targets.
+- Added `json_ignore_paths` for strict body matching on JSON APIs with known-dynamic fields (best-effort).
 
 ## Next (tight scope)
 
 - Add auth token rotation helpers for expiring credentials during long scans.
-- Improve strict matching to handle dynamic fields (e.g. ignore selected JSON paths).
 
 ## Non-goals (near-term)
 

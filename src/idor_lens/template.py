@@ -34,6 +34,13 @@ verify_tls: true
 # deny_regex:
 #   - "(?i)not authorized"
 
+# Optional: for --strict-body-match, ignore known-dynamic JSON fields (best-effort).
+# Supports JSON pointer ("/a/b/0") and dot paths ("a.b[0]"), with "*" wildcards.
+# json_ignore_paths:
+#   - /updatedAt
+#   - /requestId
+#   - /items/*/updatedAt
+
 victim:
   # Typical header-based auth:
   auth: Bearer ${{VICTIM_TOKEN}}
