@@ -11,7 +11,11 @@
 - `idor-lens summarize` summarizes JSONL output for CI/terminal use.
 - Endpoint-level cookie overrides via `endpoints[].cookies`, `victim_cookies`, and `attacker_cookies`.
 - Optional endpoint `name` field in findings; compare/summarize now key by `name` when provided.
+- Endpoint and preflight payload modes via `body_mode` (`json`, `form`, `raw`).
+- Endpoint payload `content_type` controls with per-role overrides (`victim_content_type`, `attacker_content_type`).
+- Endpoint per-role payload mode overrides via `victim_body_mode` and `attacker_body_mode`.
 - `idor-lens validate` now checks run-critical schema fields (timeouts, retries, headers/cookies maps, preflight shape).
+- `idor-lens validate` now enforces payload-mode schema rules (mode values and body type compatibility).
 - JSONL readers now report source + line/column for malformed rows.
 - Spec support for `victim/attacker` cookies + preflight requests.
 - Env var expansion in spec strings (`$VAR` / `${VAR}`).

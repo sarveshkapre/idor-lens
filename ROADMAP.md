@@ -7,5 +7,6 @@
 ## Next
 
 - Auth token rotation helpers.
-- Request payload modes beyond JSON (`data`/raw body).
 - Configurable deny-status heuristics for noisy targets.
+- Optional JUnit/SARIF export for CI/security ingestion.
+- Lightweight endpoint batching/parallelism with rate-limit-aware controls.

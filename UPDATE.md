@@ -1,3 +1,23 @@
+# Update (2026-02-09)
+
+## Summary
+
+- Added endpoint + preflight payload mode support via `body_mode` (`json`, `form`, `raw`).
+- Added payload `content_type` controls and per-role endpoint overrides (`victim_content_type`, `attacker_content_type`).
+- Added per-role endpoint payload mode overrides (`victim_body_mode`, `attacker_body_mode`).
+- Extended `idor-lens validate` to fail fast on payload mode/body mismatches.
+
+## Verification evidence
+
+```bash
+make check
+```
+
+```bash
+.venv/bin/python -m idor_lens run --spec /tmp/idor_form_smoke.yml --out /tmp/idor_form_smoke.jsonl --strict-body-match
+.venv/bin/python -m idor_lens summarize --in /tmp/idor_form_smoke.jsonl
+```
+
 # Update (2026-02-08)
 
 ## Summary

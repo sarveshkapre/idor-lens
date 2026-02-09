@@ -83,9 +83,45 @@ Tips:
 - For flaky targets, use `--retries 2 --retry-backoff 0.25` (retries 429/502/503/504 + timeouts).
 - Use `victim.timeout` / `attacker.timeout` / per-endpoint `timeout` overrides for slow endpoints.
 - Use endpoint `name` to label scenarios; compare/summarize keys prefer this when present.
+- Use endpoint/preflight `body_mode` when targets expect non-JSON payloads (`json`/`form`/`raw`).
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
 - Use `--strict-body-match` to reduce false positives when attacker gets a different 2xx body.
+
+### Request body modes (`json`, `form`, `raw`)
+
+By default endpoint and preflight `body` values are sent as JSON (`body_mode: json`).
+Use `body_mode: form` for form-encoded payloads and `body_mode: raw` for raw string bodies.
+
+```yaml
+endpoints:
+  - name: item-update-form
+    path: /items/123
+    method: POST
+    body_mode: form
+    victim_body:
+      id: 123
+    attacker_body:
+      id: 123
+
+  - name: item-update-raw
+    path: /items/123
+    method: POST
+    body_mode: raw
+    content_type: application/json
+    victim_body: '{"id":123}'
+    attacker_body: '{"id":123}'
+```
+
+Notes:
+
+- `content_type` can be set for preflight/endpoint payloads, with per-role overrides on endpoints:
+  - `victim_content_type`, `attacker_content_type`
+- Endpoint defaults can be overridden per role:
+  - `victim_body_mode`, `attacker_body_mode`
+- Defaults when omitted:
+  - `form` => `Content-Type: application/x-www-form-urlencoded`
+  - `raw` => `Content-Type: text/plain; charset=utf-8`
 
 ## HTML report
 

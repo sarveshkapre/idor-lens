@@ -51,11 +51,18 @@ python -m idor_lens --help
 - `idor-lens validate` now enforces run-critical schema checks (types/ranges for retry/timeout fields, header/cookie maps, and preflight shape).
 - JSONL parsing errors now include source + line/column diagnostics.
 
+## Shipped (2026-02-09)
+
+- Added endpoint/preflight request payload modes via `body_mode` (`json`, `form`, `raw`).
+- Added endpoint payload `content_type` controls with per-role overrides (`victim_content_type`, `attacker_content_type`).
+- Added per-role endpoint body-mode overrides (`victim_body_mode`, `attacker_body_mode`).
+- Extended `idor-lens validate` to catch payload mode/body mismatch errors before scans run.
+
 ## Next (tight scope)
 
 - Add auth token rotation helpers for expiring credentials during long scans.
-- Add request body modes beyond JSON (`data`/raw payload support) for broader API compatibility.
 - Add configurable deny-status heuristics to reduce status-only false positives in edge cases.
+- Add optional JUnit/SARIF export for CI/security dashboard ingestion.
 
 ## Non-goals (near-term)
 
