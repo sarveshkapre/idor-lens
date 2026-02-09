@@ -552,6 +552,8 @@ def run_test(
     strict_body_match: bool = False,
     fail_on_vuln: bool = False,
     max_bytes: int = _DEFAULT_MAX_BYTES,
+    only_names: list[str] | None = None,
+    only_paths: list[str] | None = None,
     verify_tls: bool | None = None,
     proxy: str | None = None,
     follow_redirects: bool | None = None,
@@ -579,6 +581,19 @@ def run_test(
 
     if max_bytes <= 0:
         raise SystemExit("--max-bytes must be > 0")
+
+    only_name_set: set[str] = set()
+    only_path_set: set[str] = set()
+    if only_names is not None:
+        for idx, n in enumerate(only_names, start=1):
+            if not isinstance(n, str) or not n:
+                raise SystemExit(f"only_names[{idx}] must be a non-empty string")
+            only_name_set.add(n)
+    if only_paths is not None:
+        for idx, p in enumerate(only_paths, start=1):
+            if not isinstance(p, str) or not p:
+                raise SystemExit(f"only_paths[{idx}] must be a non-empty string")
+            only_path_set.add(p)
 
     spec_verify_tls = _as_bool(spec.get("verify_tls"), name="verify_tls", default=True)
     verify_tls_effective = spec_verify_tls if verify_tls is None else verify_tls
@@ -751,6 +766,7 @@ def run_test(
 
     found_vulns = 0
     total = 0
+    matched = 0
 
     out_handle = None if is_stdout else out_path.open("w", encoding="utf-8")
     try:
@@ -765,6 +781,13 @@ def run_test(
             if name_raw is not None and (not isinstance(name_raw, str) or not name_raw):
                 raise SystemExit(f"endpoints[{idx}].name must be a non-empty string")
             endpoint_name = name_raw if isinstance(name_raw, str) else None
+
+            if only_name_set and endpoint_name not in only_name_set:
+                continue
+            if only_path_set and path not in only_path_set:
+                continue
+            matched += 1
+
             method = ep.get("method", "GET")
             if not isinstance(method, str) or not method:
                 raise SystemExit("endpoint method must be a non-empty string")
@@ -1038,6 +1061,15 @@ def run_test(
                 attacker_deny_match=bool(a.deny_match),
             )
             out.write(json.dumps(finding.to_dict()) + "\n")
+
+        if (only_name_set or only_path_set) and matched == 0:
+            # Avoid silently writing an empty report when a filter doesn't match.
+            parts: list[str] = []
+            if only_name_set:
+                parts.append(f"only-name={sorted(only_name_set)!r}")
+            if only_path_set:
+                parts.append(f"only-path={sorted(only_path_set)!r}")
+            raise SystemExit("no endpoints matched filters: " + ", ".join(parts))
     finally:
         if out_handle is not None:
             out_handle.close()

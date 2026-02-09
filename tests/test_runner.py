@@ -53,6 +53,87 @@ def test_run_writes_report(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     assert seen
 
 
+def test_only_name_filters_endpoints(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    seen_urls: list[str] = []
+
+    def fake_request(*args: Any, **_kwargs: Any) -> _Resp:
+        # args: (self, method, url, ...)
+        seen_urls.append(str(args[2]))
+        return _Resp(200, b'{"ok":true}')
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - name: one\n    path: /items/1\n    method: GET\n"
+        "  - name: two\n    path: /items/2\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, only_names=["two"])
+
+    # One endpoint => victim+attacker requests.
+    assert len(seen_urls) == 2
+    assert all(u.endswith("/items/2") for u in seen_urls)
+
+    lines = out.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+    row = json.loads(lines[0])
+    assert row["endpoint"] == "/items/2"
+    assert row["name"] == "two"
+
+
+def test_only_path_filters_endpoints(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    seen_urls: list[str] = []
+
+    def fake_request(*args: Any, **_kwargs: Any) -> _Resp:
+        seen_urls.append(str(args[2]))
+        return _Resp(200, b'{"ok":true}')
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - path: /items/1\n    method: GET\n"
+        "  - path: /items/2\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0, only_paths=["/items/1"])
+
+    assert len(seen_urls) == 2
+    assert all(u.endswith("/items/1") for u in seen_urls)
+    row = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert row["endpoint"] == "/items/1"
+
+
+def test_only_filters_require_match(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    def fake_request(*_args: Any, **_kwargs: Any) -> _Resp:
+        return _Resp(200, b'{"ok":true}')
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - name: one\n    path: /items/1\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    with pytest.raises(SystemExit, match="no endpoints matched filters"):
+        run_test(spec, out, timeout=1.0, only_names=["does-not-exist"])
+
+
 def test_strict_body_match_requires_equal_bodies(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
         auth = (kwargs.get("headers") or {}).get("Authorization")

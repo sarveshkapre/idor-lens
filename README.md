@@ -85,6 +85,7 @@ Tips:
 - For flaky targets, use `--retries 2 --retry-backoff 0.25` (retries 429/502/503/504 + timeouts).
 - Use `victim.timeout` / `attacker.timeout` / per-endpoint `timeout` overrides for slow endpoints.
 - Use endpoint `name` to label scenarios; compare/summarize keys prefer this when present.
+- For faster iteration, run a subset of endpoints with `idor-lens run --only-name ...` / `--only-path ...` (repeat flags to select multiple).
 - Use endpoint/preflight `body_mode` when targets expect non-JSON payloads (`json`/`form`/`raw`).
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.

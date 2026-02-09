@@ -62,6 +62,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Seconds for exponential backoff base between retries (default: 0.25)",
     )
     p_run.add_argument(
+        "--only-name",
+        action="append",
+        help="Run only endpoints matching this endpoints[].name (repeatable)",
+    )
+    p_run.add_argument(
+        "--only-path",
+        action="append",
+        help="Run only endpoints matching this endpoints[].path (repeatable)",
+    )
+    p_run.add_argument(
         "--proxy", help="Proxy URL for both victim and attacker (e.g. http://127.0.0.1:8080)"
     )
     p_run.add_argument(
@@ -259,6 +269,8 @@ def _run(args: argparse.Namespace) -> int:
         strict_body_match=bool(args.strict_body_match),
         fail_on_vuln=bool(args.fail_on_vuln),
         max_bytes=int(args.max_bytes),
+        only_names=(list(args.only_name) if args.only_name else None),
+        only_paths=(list(args.only_path) if args.only_path else None),
         verify_tls=(False if bool(args.insecure) else None),
         proxy=(str(args.proxy) if args.proxy is not None else None),
         follow_redirects=(
