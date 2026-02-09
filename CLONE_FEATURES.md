@@ -7,22 +7,26 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P1: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
+- [ ] P1: Add `idor-lens run --only-name/--only-path` filters for faster iteration in CI and local debugging (replay exists, but filtering helps keep JSONL naming and CI wiring stable).
+  - Score: impact=high, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
+- [ ] P1: Add a `--max-response-bytes` hard cap (stop reading after N bytes) for hostile endpoints that stream indefinitely or return huge bodies.
+  - Score: impact=high, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
+- [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
   - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=medium-low.
-- [ ] P2: Add lightweight endpoint batching/parallelism with rate-limit-aware controls (max in-flight, 429 backoff).
-  - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
-- [ ] P2: Add richer allow/deny heuristics beyond status codes (e.g. `allow_contains`/`allow_regex` + optional header matching), to reduce false positives on apps that return 2xx deny pages and false negatives on apps that use 404-on-deny patterns.
+- [ ] P2: Add richer allow/deny heuristics beyond status codes (e.g. `allow_contains`/`allow_regex` + optional header/content-length matching), to reduce false positives on apps that return 2xx deny pages and false negatives on apps that use 404-on-deny patterns.
   - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium.
+- [ ] P2: Add a debug mode that logs outgoing requests (method/url/headers and small body sample) with redaction rules, to speed up spec iteration without opening Burp.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
 - [ ] P2: Add an optional token refresh command helper (`auth_command`) with explicit opt-in guardrails for long scans where `auth_file` is inconvenient.
   - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium-low.
+- [ ] P3: Add lightweight endpoint batching/parallelism with rate-limit-aware controls (max in-flight, 429 backoff).
+  - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
 - [ ] P3: Add multi-role support (more than victim/attacker) to allow authorization matrices similar to common Burp workflows.
   - Score: impact=medium, effort=high, fit=medium, differentiation=high, risk=high, confidence=low.
-- [ ] P3: Add `idor-lens run --only-name/--only-path` filters for faster iteration in CI and local debugging (replay exists, but filtering helps keep JSONL naming and CI wiring stable).
-  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
-- [ ] P3: Add a debug mode that logs outgoing requests (method/url/headers and small body sample) with redaction rules, to speed up spec iteration without opening Burp.
-  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
-- [ ] P3: Add a `--max-response-bytes` hard cap (stop reading after N bytes) for hostile endpoints that stream indefinitely or return huge bodies.
-  - Score: impact=medium, effort=medium, fit=medium, differentiation=low, risk=medium, confidence=medium.
+- [ ] P3: Publish a JSON Schema for the YAML spec (and/or `idor-lens schema --out -`) for editor IntelliSense and downstream validation.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=low, confidence=medium.
+- [ ] P3: Add a `--strict-status`/`--deny-statuses` control to treat non-2xx patterns explicitly (useful when targets use 404/200 in unusual ways).
+  - Score: impact=low-medium, effort=low-medium, fit=medium, differentiation=low, risk=low, confidence=medium.
 
 ## Implemented
 - [x] 2026-02-09: Streamed response reads in runner (hash/sample up to `--max-bytes` without buffering full bodies).
@@ -74,6 +78,8 @@
   - AuthMatrix/Autorize UX patterns worth matching (non-proprietary patterns): fast "replay" of a single request across roles, explicit allow/deny signals beyond status codes, and summarizing mismatches by endpoint key.
     - https://github.com/PortSwigger/auth-matrix (AuthMatrix docs)
     - https://github.com/PortSwigger/autorize (Autorize docs)
+  - Additional authorization-testing extension patterns (untrusted web signal): enforcement detectors often support fingerprints in body/headers and/or content-length-based matching, plus per-user vs global rules.
+    - https://github.com/emanuelfc/Authorize (Authorize extension)
   - PortSwigger Web Security Academy guidance: Insecure direct object references (IDOR).
     - https://portswigger.net/web-security/access-control/idor
   - OWASP API Security Top 10: API1:2023 Broken Object Level Authorization (BOLA), the API-world equivalent of IDOR.
