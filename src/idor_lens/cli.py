@@ -9,6 +9,7 @@ from .jsonl import open_text_out
 from .junit import write_junit_report
 from .report import write_html_report
 from .runner import run_test
+from .sarif import write_sarif_report
 from .summarize import summarize_jsonl, write_summary
 from .template import SpecTemplateOptions, render_spec_template
 from .validate import validate_spec
@@ -167,6 +168,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_junit.set_defaults(func=_junit)
 
+    p_sarif = sub.add_parser("sarif", help="Write a SARIF 2.1.0 report from a JSONL run output")
+    p_sarif.add_argument(
+        "--in", dest="in_path", required=True, help="Input JSONL path, or '-' for stdin"
+    )
+    p_sarif.add_argument(
+        "--out",
+        dest="out_path",
+        default="idor-report.sarif",
+        help="Output path (default: idor-report.sarif, or '-' for stdout)",
+    )
+    p_sarif.add_argument(
+        "--min-confidence",
+        default="medium",
+        choices=["none", "medium", "high"],
+        help="Treat vulnerabilities below this confidence as non-vulnerable",
+    )
+    p_sarif.set_defaults(func=_sarif)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -232,6 +251,15 @@ def _summarize(args: argparse.Namespace) -> int:
 
 def _junit(args: argparse.Namespace) -> int:
     write_junit_report(
+        Path(args.in_path),
+        Path(args.out_path),
+        min_confidence=str(args.min_confidence),
+    )
+    return 0
+
+
+def _sarif(args: argparse.Namespace) -> int:
+    write_sarif_report(
         Path(args.in_path),
         Path(args.out_path),
         min_confidence=str(args.min_confidence),

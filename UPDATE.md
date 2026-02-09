@@ -6,6 +6,7 @@
 - Added payload `content_type` controls and per-role endpoint overrides (`victim_content_type`, `attacker_content_type`).
 - Added per-role endpoint payload mode overrides (`victim_body_mode`, `attacker_body_mode`).
 - Extended `idor-lens validate` to fail fast on payload mode/body mismatches.
+- Added SARIF export (`idor-lens sarif`) for security dashboard ingestion.
 
 ## Verification evidence
 

@@ -7,21 +7,27 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P0 (Selected): Add SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboards.
-  - Score: impact=high, effort=low, fit=high, differentiation=medium, risk=low, confidence=medium.
-- [ ] P1 (Selected): Add configurable deny-response heuristics for noisy targets where access denial returns 2xx.
-  - Proposed: `deny_contains` / `deny_regex` patterns (spec-level + per-endpoint) applied to attacker response body.
+- [ ] P0 (Selected): Add configurable deny-response heuristics for noisy targets where access denial returns 2xx.
+  - Proposed: `deny_contains` / `deny_regex` patterns (spec-level + per-endpoint), applied to responses to override the status-only signal.
   - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium.
+- [ ] P1 (Selected): Add first-class CI workflow examples (GitHub Actions) using `--fail-on-vuln`, compare baseline mode, and SARIF upload.
+  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
+- [ ] P1: Improve response diffing: allow ignoring dynamic fields (e.g. timestamps) for strict matching via `json_ignore_paths`.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=low.
 - [ ] P2: Add auth token rotation helpers for expiring credentials during long scans.
   - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=low.
-- [ ] P2: Add lightweight endpoint batching/parallelism with rate-limit-aware controls.
+- [ ] P2: Add lightweight endpoint batching/parallelism with rate-limit-aware controls (max in-flight, 429 backoff).
   - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
 - [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
   - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=low.
-- [ ] P3: Add first-class CI workflow examples (GitHub Actions) using `--fail-on-vuln` + compare baseline mode.
-  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
+- [ ] P3: Add a `idor-lens replay` utility that replays a single endpoint with victim/attacker for interactive debugging.
+  - Score: impact=low, effort=medium, fit=medium, differentiation=low, risk=low, confidence=low.
+- [ ] P3: Add a small "spec cookbook" doc with patterns: CSRF preflight, cookie auth, proxying via Burp, deny heuristics, and strict-body tuning.
+  - Score: impact=medium, effort=low, fit=high, differentiation=low, risk=low, confidence=medium.
 
 ## Implemented
+- [x] 2026-02-09: Added SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboard ingestion.
+  Evidence: `src/idor_lens/sarif.py`, `src/idor_lens/cli.py`, `tests/test_sarif.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Added JUnit XML export (`idor-lens junit`) for CI ingestion.
   Evidence: `src/idor_lens/junit.py`, `src/idor_lens/cli.py`, `tests/test_junit.py`; gate: `make check`.
 - [x] 2026-02-09: Added endpoint + preflight payload modes (`body_mode`: `json`/`form`/`raw`) with per-endpoint role overrides (`victim_body_mode`, `attacker_body_mode`).
@@ -48,10 +54,14 @@
 - Naming scan scenarios in specs (`endpoints[].name`) makes regression output materially clearer when multiple checks hit the same path.
 - JSONL tooling benefits from explicit parse-location errors because report/compare/summarize are often run in CI where raw tracebacks are noisy.
 - Payload mode defaults must stay explicit and deterministic to keep scan reproducibility high across differing API stacks.
-- Market scan (untrusted web signal): established tools emphasize authorization testing across roles, response diffing, and CI-friendly reporting.
-  - PortSwigger guidance on IDOR testing focuses on manipulating identifiers and comparing responses between roles. Sources: PortSwigger Web Security Academy.
-  - OWASP ZAP’s Access Control Testing add-on supports role-based access rules/scans and report generation. Sources: ZAP Marketplace/GitHub.
-  - SARIF is the common interchange format for static/security results ingestion on platforms like GitHub. Sources: SARIF spec (OASIS).
+- Market scan (untrusted web signal): established workflows emphasize (1) role/session realism, (2) response diffing beyond status codes, and (3) CI/security-dashboard friendly exports.
+  - Burp Suite extensions commonly used for authorization testing: AuthMatrix and Autorize.
+    - https://portswigger.net/bappstore/cbff8e57c1cf4c66af0d9c1c0a6d6e1b (AuthMatrix)
+    - https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f (Autorize)
+  - PortSwigger Web Security Academy guidance: Insecure direct object references (IDOR).
+    - https://portswigger.net/web-security/access-control/idor
+  - SARIF 2.1.0 is a common interchange format for ingesting scan results (e.g. GitHub code scanning).
+    - https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 
 ## Notes
 - This file is maintained by the autonomous clone loop.

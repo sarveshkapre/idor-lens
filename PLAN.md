@@ -57,12 +57,13 @@ python -m idor_lens --help
 - Added endpoint payload `content_type` controls with per-role overrides (`victim_content_type`, `attacker_content_type`).
 - Added per-role endpoint body-mode overrides (`victim_body_mode`, `attacker_body_mode`).
 - Extended `idor-lens validate` to catch payload mode/body mismatch errors before scans run.
+- Added SARIF export (`idor-lens sarif`) for GitHub code scanning / security dashboard ingestion.
 
 ## Next (tight scope)
 
 - Add auth token rotation helpers for expiring credentials during long scans.
 - Add configurable deny-status heuristics to reduce status-only false positives in edge cases.
-- Add optional JUnit/SARIF export for CI/security dashboard ingestion.
+- Add optional GitHub Actions workflow examples for CI/regression mode.
 
 ## Non-goals (near-term)
 

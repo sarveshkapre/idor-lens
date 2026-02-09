@@ -8,5 +8,5 @@
 
 - Auth token rotation helpers.
 - Configurable deny-status heuristics for noisy targets.
-- Optional JUnit/SARIF export for CI/security ingestion.
+- Optional CI workflow examples (GitHub Actions) for baseline compare + security ingestion.
 - Lightweight endpoint batching/parallelism with rate-limit-aware controls.
