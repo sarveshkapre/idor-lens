@@ -7,10 +7,6 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P1: Add `idor-lens run --only-name/--only-path` filters for faster iteration in CI and local debugging (replay exists, but filtering helps keep JSONL naming and CI wiring stable).
-  - Score: impact=high, effort=low, fit=high, differentiation=low, risk=low, confidence=high.
-- [ ] P1: Add a `--max-response-bytes` hard cap (stop reading after N bytes) for hostile endpoints that stream indefinitely or return huge bodies.
-  - Score: impact=high, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
 - [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
   - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=medium-low.
 - [ ] P2: Add richer allow/deny heuristics beyond status codes (e.g. `allow_contains`/`allow_regex` + optional header/content-length matching), to reduce false positives on apps that return 2xx deny pages and false negatives on apps that use 404-on-deny patterns.

@@ -18,9 +18,9 @@
 - Why: Replay is good for single-endpoint debug, but CI and local iteration often need a stable subset run while keeping the full spec intact.
 - Evidence:
   - Implementation: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`
-  - Tests: `tests/test_runner.py`
-  - Verification: `make check` (pass)
-- Commit: TBD
+- Tests: `tests/test_runner.py`
+- Verification: `make check` (pass)
+- Commit: `494b77a`
 - Confidence: high
 - Trust label: verified-local
 
@@ -32,9 +32,14 @@
   - Implementation: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`, `src/idor_lens/report.py`
   - Tests: `tests/test_runner.py`
   - Verification: `make check` (pass)
-- Commit: TBD
+- Commit: `efbe7c4`
 - Confidence: medium-high
 - Trust label: verified-local
+
+## 2026-02-09 - Verification Evidence (Cycle 5)
+
+- `make check` (pass)
+- `gh run list --limit 10` (pass; recent runs all successful)
 
 ## 2026-02-09 - auth_file Token Rotation Helper
 
