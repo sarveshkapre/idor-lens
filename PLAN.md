@@ -63,7 +63,8 @@ python -m idor_lens --help
 
 ## Next (tight scope)
 
-- Add auth token rotation helpers for expiring credentials during long scans.
+- Expand beyond status-only signals with richer allow/deny heuristics (to reduce false positives/negatives).
+- Add parametrized endpoint matrices (intruder-style ID substitution) to improve coverage.
 
 ## Non-goals (near-term)
 

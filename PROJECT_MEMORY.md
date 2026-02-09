@@ -1,5 +1,45 @@
 # PROJECT_MEMORY
 
+## 2026-02-09 - Streaming Response Reads
+
+- Decision: Read response bodies via streaming iteration (still hashing/sampling up to `--max-bytes`) to avoid buffering large responses in memory.
+- Why: Some IDOR targets return very large responses; buffering full bodies creates avoidable memory pressure and reduces scan reliability.
+- Evidence:
+  - Implementation: `src/idor_lens/runner.py`
+  - Tests: `tests/test_runner.py`
+  - Verification: `make check` (pass)
+- Commit: `1d0620e`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-09 - auth_file Token Rotation Helper
+
+- Decision: Add `victim/attacker.auth_file` to read the full `Authorization` header value from a file per request; enforce mutual exclusivity with `auth`.
+- Why: Real tokens expire during long scans; file-based rotation is simple, CI-friendly, and works with external refreshers without embedding refresh logic into specs.
+- Evidence:
+  - Runner + validation: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`
+  - Template/docs: `src/idor_lens/template.py`, `README.md`, `docs/spec-cookbook.md`
+  - Tests: `tests/test_runner.py`, `tests/test_validate.py`
+  - Verification: `make check` (pass)
+- Commit: `a7cf919`
+- Confidence: high
+- Trust label: verified-local
+- Follow-ups:
+  - Consider an opt-in `auth_command` helper for cases where file rotation is awkward.
+
+## 2026-02-09 - replay Subcommand
+
+- Decision: Add `idor-lens replay` to replay a single endpoint selected by `--name`, `--path`, or `--index` from an existing spec.
+- Why: Iterating on headers/cookies/deny heuristics is fastest when you can replay one scenario without editing specs or running a full scan.
+- Evidence:
+  - CLI: `src/idor_lens/cli.py`
+  - Docs: `README.md`
+  - Tests: `tests/test_smoke.py`
+  - Verification: `make check` (pass)
+- Commit: `2690d34`
+- Confidence: high
+- Trust label: verified-local
+
 ## 2026-02-09 - JSON Ignore Paths For Strict Matching
 
 - Decision: Add `json_ignore_paths` (spec-level + per-endpoint) to ignore known-dynamic JSON fields when using `--strict-body-match`, plus treat empty response bodies as a match.

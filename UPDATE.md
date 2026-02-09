@@ -6,6 +6,9 @@
 - Added payload `content_type` controls and per-role endpoint overrides (`victim_content_type`, `attacker_content_type`).
 - Added per-role endpoint payload mode overrides (`victim_body_mode`, `attacker_body_mode`).
 - Extended `idor-lens validate` to fail fast on payload mode/body mismatches.
+- Added `auth_file` support for rotating `Authorization` tokens during long scans.
+- Added `idor-lens replay` to replay a single endpoint from a spec for debugging.
+- Streamed response reads in runner (hash/sample up to `--max-bytes` without buffering full bodies).
 - Added SARIF export (`idor-lens sarif`) for security dashboard ingestion.
 - Added configurable deny heuristics via `deny_contains` / `deny_regex` for targets that return 2xx on access denial.
 - Added GitHub Actions CI workflow examples (fail-on-vuln, regression compare, SARIF upload).

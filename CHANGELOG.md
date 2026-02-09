@@ -6,11 +6,13 @@
 
 - `idor-lens report` renders a clean HTML report from JSONL output.
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
+- `idor-lens replay` replays a single endpoint from a spec (victim vs attacker) for debugging.
 - `idor-lens junit` writes JUnit XML from JSONL output (CI ingestion).
 - `idor-lens sarif` writes SARIF 2.1.0 from JSONL output (security dashboard ingestion).
 - `idor-lens init` writes a starter YAML spec.
 - `idor-lens validate` validates a spec and can fail on missing env vars.
 - `idor-lens summarize` summarizes JSONL output for CI/terminal use.
+- `victim/attacker.auth_file` reads the full `Authorization` header value from a file per request (token rotation helper).
 - Endpoint-level cookie overrides via `endpoints[].cookies`, `victim_cookies`, and `attacker_cookies`.
 - Optional endpoint `name` field in findings; compare/summarize now key by `name` when provided.
 - Endpoint and preflight payload modes via `body_mode` (`json`, `form`, `raw`).
@@ -33,6 +35,7 @@
 - JSONL findings now include more proof fields (URL, timing, bytes + sha256, truncation, request errors).
 - `idor-lens run` supports `--out -`, `--fail-on-vuln`, and `--strict-body-match`.
 - When using `--out -`, status output is written to stderr to keep stdout as pure JSONL.
+- `idor-lens run` reads response bodies in a streaming manner to avoid buffering large responses in memory.
 
 ## v0.1.0 - 2026-01-31
 
