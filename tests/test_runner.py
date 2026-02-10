@@ -519,6 +519,38 @@ def test_deny_heuristics_override_status_only_signal(
     assert data["reason"] == "attacker denied (deny heuristics)"
 
 
+def test_allow_heuristics_reduce_status_only_false_positives(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    def fake_request(*_args: Any, **kwargs: Any) -> _Resp:
+        auth = (kwargs.get("headers") or {}).get("Authorization")
+        if auth == "Bearer victim":
+            return _Resp(200, b'{"id":123,"secret":"victim"}')
+        # Noisy targets sometimes return 2xx for denial pages; allow heuristics should prevent a false positive.
+        return _Resp(200, b"ACCESS DENIED")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "allow_contains:\n"
+        '  - "\\"secret\\""\n'
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n  - path: /items/123\n    method: GET\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    data = json.loads(out.read_text(encoding="utf-8").strip().splitlines()[0])
+    assert data["vulnerable"] is False
+    assert data["victim_allow_match"] is True
+    assert data["attacker_allow_match"] is False
+    assert data["reason"] == "attacker denied (allow heuristics)"
+
+
 def test_timeout_overrides_are_applied(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     seen_timeouts: dict[str, float] = {}
 

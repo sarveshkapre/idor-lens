@@ -116,6 +116,20 @@ deny_regex:
 
 You can also set these per endpoint.
 
+## Allow Heuristics To Reduce Status-Only False Positives
+
+Some targets return a 2xx denial page that is hard to capture with deny heuristics alone. If you can fingerprint a
+"real allowed" response, set allow heuristics:
+
+```yaml
+allow_contains:
+  - "\"secret\""
+allow_regex:
+  - "\"owner\"\\s*:\\s*\"[^\"]+\""
+```
+
+When allow heuristics are set, a role is treated as "allowed" only when `2xx AND allow_match AND NOT deny_match`.
+
 ## Strict Body Matching With Dynamic JSON Fields
 
 Use `--strict-body-match` to only flag a vulnerability when the attacker response body matches the victim response body.

@@ -33,6 +33,13 @@ verify_tls: true
 #   - access denied
 # deny_regex:
 #   - "(?i)not authorized"
+#
+# Optional: allow heuristics to reduce status-only false positives when attacker gets a 2xx denial page.
+# When set, a role is treated as "allowed" only when 2xx AND allow_match AND NOT deny_match.
+# allow_contains:
+#   - "\"secret\""
+# allow_regex:
+#   - "\"owner\"\\s*:\\s*\"[^\"]+\""
 
 # Optional: for --strict-body-match, ignore known-dynamic JSON fields (best-effort).
 # Supports JSON pointer ("/a/b/0") and dot paths ("a.b[0]"), with "*" wildcards.

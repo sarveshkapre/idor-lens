@@ -63,6 +63,8 @@ class Finding:
     attacker_error: str | None
     victim_deny_match: bool
     attacker_deny_match: bool
+    victim_allow_match: bool | None
+    attacker_allow_match: bool | None
     victim_response_capped: bool
     attacker_response_capped: bool
 
@@ -93,6 +95,8 @@ class Finding:
             "attacker_error": self.attacker_error,
             "victim_deny_match": self.victim_deny_match,
             "attacker_deny_match": self.attacker_deny_match,
+            "victim_allow_match": self.victim_allow_match,
+            "attacker_allow_match": self.attacker_allow_match,
             "victim_response_capped": self.victim_response_capped,
             "attacker_response_capped": self.attacker_response_capped,
         }
@@ -259,6 +263,7 @@ class _Proof:
     error: str | None
     attempts: int
     deny_match: bool
+    allow_match: bool
     response_capped: bool
 
 
@@ -338,6 +343,8 @@ def _request_with_proof(
     retries: int,
     retry_backoff_s: float,
     retry_statuses: set[int],
+    allow_contains: list[str],
+    allow_regexes: list[re.Pattern[str]],
     deny_contains: list[str],
     deny_regexes: list[re.Pattern[str]],
 ) -> _Proof:
@@ -394,6 +401,7 @@ def _request_with_proof(
     last_sample: bytes = b""
     last_num_bytes = 0
     deny_match = False
+    allow_match = False
     attempts_used = 0
     response_capped = False
 
@@ -420,11 +428,13 @@ def _request_with_proof(
             )
             last_error = None
             deny_match = False
+            allow_match = False
 
-            if (deny_contains or deny_regexes) and last_sample:
+            if (allow_contains or allow_regexes or deny_contains or deny_regexes) and last_sample:
                 # Only examine the first max_bytes since we already hash at most that much.
                 text = last_sample.decode("utf-8", errors="replace")
                 lower = text.lower()
+
                 for needle in deny_contains:
                     if needle.lower() in lower:
                         deny_match = True
@@ -433,6 +443,16 @@ def _request_with_proof(
                     for rx in deny_regexes:
                         if rx.search(text) is not None:
                             deny_match = True
+                            break
+
+                for needle in allow_contains:
+                    if needle.lower() in lower:
+                        allow_match = True
+                        break
+                if not allow_match:
+                    for rx in allow_regexes:
+                        if rx.search(text) is not None:
+                            allow_match = True
                             break
 
             should_retry = attempt < max_attempts and last_status in retry_statuses
@@ -467,6 +487,7 @@ def _request_with_proof(
         error=last_error,
         attempts=attempts_used,
         deny_match=deny_match,
+        allow_match=allow_match,
         response_capped=response_capped,
     )
 
@@ -562,6 +583,8 @@ def _run_preflight(
             retries=retries,
             retry_backoff_s=retry_backoff_s,
             retry_statuses=retry_statuses,
+            allow_contains=[],
+            allow_regexes=[],
             deny_contains=[],
             deny_regexes=[],
         )
@@ -661,6 +684,8 @@ def run_test(
 
     spec_deny_contains = _as_str_list(spec.get("deny_contains"), name="deny_contains")
     spec_deny_regexes = _as_regex_list(spec.get("deny_regex"), name="deny_regex")
+    spec_allow_contains = _as_str_list(spec.get("allow_contains"), name="allow_contains")
+    spec_allow_regexes = _as_regex_list(spec.get("allow_regex"), name="allow_regex")
     spec_json_ignore_paths = _as_str_list(spec.get("json_ignore_paths"), name="json_ignore_paths")
 
     victim_token = _as_optional_non_empty_str(victim.get("auth"), name="victim.auth")
@@ -964,6 +989,15 @@ def run_test(
             )
             deny_contains = [*spec_deny_contains, *ep_deny_contains]
             deny_regexes = [*spec_deny_regexes, *ep_deny_regexes]
+            ep_allow_contains = _as_str_list(
+                ep.get("allow_contains"), name=f"endpoints[{idx}].allow_contains"
+            )
+            ep_allow_regexes = _as_regex_list(
+                ep.get("allow_regex"), name=f"endpoints[{idx}].allow_regex"
+            )
+            allow_contains = [*spec_allow_contains, *ep_allow_contains]
+            allow_regexes = [*spec_allow_regexes, *ep_allow_regexes]
+            allow_required = bool(allow_contains or allow_regexes)
             ep_json_ignore_paths = _as_str_list(
                 ep.get("json_ignore_paths"), name=f"endpoints[{idx}].json_ignore_paths"
             )
@@ -988,6 +1022,8 @@ def run_test(
                 retries=victim_retries,
                 retry_backoff_s=victim_retry_backoff_s,
                 retry_statuses=retry_statuses,
+                allow_contains=allow_contains,
+                allow_regexes=allow_regexes,
                 deny_contains=deny_contains,
                 deny_regexes=deny_regexes,
             )
@@ -1008,6 +1044,8 @@ def run_test(
                 retries=attacker_retries,
                 retry_backoff_s=attacker_retry_backoff_s,
                 retry_statuses=retry_statuses,
+                allow_contains=allow_contains,
+                allow_regexes=allow_regexes,
                 deny_contains=deny_contains,
                 deny_regexes=deny_regexes,
             )
@@ -1015,8 +1053,12 @@ def run_test(
 
             victim_2xx = 200 <= v.status < 300
             attacker_2xx = 200 <= a.status < 300
-            victim_ok = victim_2xx and not v.deny_match
-            attacker_ok = attacker_2xx and not a.deny_match
+            victim_ok = (
+                victim_2xx and not v.deny_match and (v.allow_match if allow_required else True)
+            )
+            attacker_ok = (
+                attacker_2xx and not a.deny_match and (a.allow_match if allow_required else True)
+            )
             body_match = (
                 v.num_bytes == 0
                 and a.num_bytes == 0
@@ -1060,10 +1102,14 @@ def run_test(
                 reason = "both roles matched deny heuristics; cannot assess"
             elif v.deny_match:
                 reason = "victim matched deny heuristics; cannot assess"
+            elif allow_required and not v.allow_match:
+                reason = "victim did not match allow heuristics; cannot assess"
             elif not attacker_2xx:
                 reason = "attacker denied"
             elif a.deny_match:
                 reason = "attacker denied (deny heuristics)"
+            elif allow_required and not a.allow_match:
+                reason = "attacker denied (allow heuristics)"
             elif strict_body_match and (v.response_capped or a.response_capped):
                 reason = "response capped; strict body match cannot assess"
             elif strict_body_match and not body_match:
@@ -1103,6 +1149,8 @@ def run_test(
                 attacker_error=a.error,
                 victim_deny_match=bool(v.deny_match),
                 attacker_deny_match=bool(a.deny_match),
+                victim_allow_match=(bool(v.allow_match) if allow_required else None),
+                attacker_allow_match=(bool(a.allow_match) if allow_required else None),
                 victim_response_capped=bool(v.response_capped),
                 attacker_response_capped=bool(a.response_capped),
             )

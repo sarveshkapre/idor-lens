@@ -161,6 +161,23 @@ def test_validate_accepts_deny_heuristics(tmp_path: Path) -> None:
     assert validate_spec(spec, require_env=True) == 0
 
 
+def test_validate_accepts_allow_heuristics(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "allow_contains:\n"
+        '  - "\\"secret\\""\n'
+        "allow_regex:\n"
+        '  - "(?i)owner"\n'
+        "endpoints:\n"
+        "  - path: /items/123\n"
+        "    allow_contains:\n"
+        '      - "\\"id\\""\n',
+        encoding="utf-8",
+    )
+    assert validate_spec(spec, require_env=True) == 0
+
+
 def test_validate_rejects_invalid_deny_regex(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yml"
     spec.write_text(

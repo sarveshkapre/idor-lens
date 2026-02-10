@@ -234,6 +234,8 @@ def _validate_endpoint(value: Any, *, idx: int) -> None:
     )
     _require_string_list(endpoint.get("deny_contains"), name=f"{name}.deny_contains")
     _require_regex_list(endpoint.get("deny_regex"), name=f"{name}.deny_regex")
+    _require_string_list(endpoint.get("allow_contains"), name=f"{name}.allow_contains")
+    _require_regex_list(endpoint.get("allow_regex"), name=f"{name}.allow_regex")
     _require_json_ignore_paths(endpoint.get("json_ignore_paths"), name=f"{name}.json_ignore_paths")
 
     endpoint_body = endpoint.get("victim_body")
@@ -274,6 +276,8 @@ def validate_spec(spec_path: Path, *, require_env: bool) -> int:
     _require_int_list(spec.get("retry_statuses"), name="retry_statuses")
     _require_string_list(spec.get("deny_contains"), name="deny_contains")
     _require_regex_list(spec.get("deny_regex"), name="deny_regex")
+    _require_string_list(spec.get("allow_contains"), name="allow_contains")
+    _require_regex_list(spec.get("allow_regex"), name="allow_regex")
     _require_json_ignore_paths(spec.get("json_ignore_paths"), name="json_ignore_paths")
 
     _validate_role(spec.get("victim", {}), name="victim")
