@@ -39,6 +39,12 @@ python -m idor_lens validate --spec spec.yml --require-env
 
 Validation checks run-critical schema fields too (timeouts/retries, preflight shape, and header/cookie map types) so bad specs fail fast before requests are sent.
 
+Generate a JSON Schema for editor IntelliSense:
+
+```bash
+python -m idor_lens schema --out docs/idor-lens.schema.json
+```
+
 ### Auth realism (cookies + preflight)
 
 Many apps need cookies/CSRF/bootstrap requests before protected endpoints behave realistically.

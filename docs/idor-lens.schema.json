@@ -1,0 +1,614 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allow_contains": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "allow_regex": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "attacker": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "auth",
+              "auth_file"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "auth": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "auth_file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cookies": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "follow_redirects": {
+          "type": "boolean"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "preflight": {
+          "items": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "body_mode": {
+                      "const": "form"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "additionalProperties": {},
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "body_mode": {
+                      "const": "raw"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "body": {},
+              "body_mode": {
+                "enum": [
+                  "json",
+                  "form",
+                  "raw"
+                ],
+                "type": "string"
+              },
+              "content_type": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "method": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "path": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "timeout": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "proxy": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retries": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retry_backoff_s": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "timeout": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "verify_tls": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "base_url": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "deny_contains": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "deny_regex": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "endpoints": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "victim_body_mode": {
+                  "const": "form"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "victim_body": {
+                  "additionalProperties": {},
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "victim_body_mode": {
+                  "const": "raw"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "victim_body": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "attacker_body_mode": {
+                  "const": "form"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "attacker_body": {
+                  "additionalProperties": {},
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "attacker_body_mode": {
+                  "const": "raw"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "attacker_body": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "allow_contains": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "allow_regex": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "attacker_body": {},
+          "attacker_body_mode": {
+            "enum": [
+              "json",
+              "form",
+              "raw"
+            ],
+            "type": "string"
+          },
+          "attacker_content_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "attacker_cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "attacker_follow_redirects": {
+            "type": "boolean"
+          },
+          "attacker_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "attacker_timeout": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "body_mode": {
+            "enum": [
+              "json",
+              "form",
+              "raw"
+            ],
+            "type": "string"
+          },
+          "content_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "deny_contains": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "deny_regex": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "follow_redirects": {
+            "type": "boolean"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "json_ignore_paths": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "method": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "timeout": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "victim_body": {},
+          "victim_body_mode": {
+            "enum": [
+              "json",
+              "form",
+              "raw"
+            ],
+            "type": "string"
+          },
+          "victim_content_type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "victim_cookies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "victim_follow_redirects": {
+            "type": "boolean"
+          },
+          "victim_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "victim_timeout": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "follow_redirects": {
+      "type": "boolean"
+    },
+    "json_ignore_paths": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "proxy": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "retries": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "retry_backoff_s": {
+      "minimum": 0,
+      "type": "number"
+    },
+    "retry_statuses": {
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "verify_tls": {
+      "type": "boolean"
+    },
+    "victim": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "auth",
+              "auth_file"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "auth": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "auth_file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cookies": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "follow_redirects": {
+          "type": "boolean"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "preflight": {
+          "items": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "body_mode": {
+                      "const": "form"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "additionalProperties": {},
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "body_mode": {
+                      "const": "raw"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "body": {},
+              "body_mode": {
+                "enum": [
+                  "json",
+                  "form",
+                  "raw"
+                ],
+                "type": "string"
+              },
+              "content_type": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "method": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "path": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "timeout": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "proxy": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retries": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retry_backoff_s": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "timeout": {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        "verify_tls": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "base_url",
+    "endpoints"
+  ],
+  "title": "IDOR Lens Spec",
+  "type": "object"
+}

@@ -13,6 +13,7 @@ from .junit import write_junit_report
 from .report import write_html_report
 from .runner import run_test
 from .sarif import write_sarif_report
+from .schema import write_spec_schema
 from .summarize import summarize_jsonl, write_summary
 from .template import SpecTemplateOptions, render_spec_template
 from .validate import validate_spec
@@ -269,6 +270,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_sarif.set_defaults(func=_sarif)
 
+    p_schema = sub.add_parser("schema", help="Write a JSON Schema for the YAML spec")
+    p_schema.add_argument(
+        "--out",
+        dest="out_path",
+        default="-",
+        help="Output path, or '-' for stdout (default: '-')",
+    )
+    p_schema.set_defaults(func=_schema)
+
     args = parser.parse_args(argv)
     return int(args.func(args))
 
@@ -425,6 +435,11 @@ def _sarif(args: argparse.Namespace) -> int:
         Path(args.out_path),
         min_confidence=str(args.min_confidence),
     )
+    return 0
+
+
+def _schema(args: argparse.Namespace) -> int:
+    write_spec_schema(Path(args.out_path))
     return 0
 
 

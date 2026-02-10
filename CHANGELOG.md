@@ -24,6 +24,7 @@
 - `idor-lens validate` now enforces payload-mode schema rules (mode values and body type compatibility).
 - Configurable deny-response heuristics via `deny_contains` / `deny_regex` (spec-level + per-endpoint).
 - Configurable allow-response heuristics via `allow_contains` / `allow_regex` (spec-level + per-endpoint).
+- `idor-lens schema` writes a JSON Schema for the YAML spec (editor IntelliSense / downstream validation).
 - `json_ignore_paths` to ignore known-dynamic JSON fields for strict body matching (best-effort).
 - JSONL readers now report source + line/column for malformed rows.
 - Spec support for `victim/attacker` cookies + preflight requests.
