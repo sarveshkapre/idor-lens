@@ -1,3 +1,21 @@
+# Update (2026-02-10)
+
+## Summary
+
+- Added allow-response heuristics via `allow_contains` / `allow_regex` to reduce status-only false positives when attacker receives a 2xx denial page.
+- Published a JSON Schema for the YAML spec and added `idor-lens schema` for editor IntelliSense.
+
+## Verification evidence
+
+```bash
+make check
+```
+
+```bash
+.venv/bin/python -m idor_lens schema --out - | head
+.venv/bin/python -m idor_lens init --out - --base-url https://example.test | head
+```
+
 # Update (2026-02-09)
 
 ## Summary

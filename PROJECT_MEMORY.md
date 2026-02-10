@@ -1,5 +1,39 @@
 # PROJECT_MEMORY
 
+## 2026-02-10 - Allow Heuristics For Noisy 2xx Denial Pages
+
+- Decision: Add `allow_contains` / `allow_regex` heuristics (spec-level + per-endpoint) and treat a role as "allowed" only when `2xx AND allow_match AND NOT deny_match` when allow heuristics are configured.
+- Why: Status-only signals are a major false-positive vector on targets that return a 2xx denial page; allow heuristics provide a low-friction way to require a positive "allowed" fingerprint without forcing full strict-body matching.
+- Evidence:
+  - Implementation: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/report.py`, `src/idor_lens/template.py`
+  - Docs: `README.md`, `docs/spec-cookbook.md`
+  - Tests: `tests/test_runner.py`, `tests/test_validate.py`
+  - Verification: `make check` (pass)
+- Commit: `8ae1d6e`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-10 - Spec JSON Schema + schema Subcommand
+
+- Decision: Publish a JSON Schema for the YAML spec and add `idor-lens schema --out -` to emit it (kept in sync via a test against `docs/idor-lens.schema.json`).
+- Why: Spec authoring is the primary UX; editor IntelliSense and lightweight schema validation reduce typo-driven failures and shorten iteration time.
+- Evidence:
+  - Implementation: `src/idor_lens/schema.py`, `src/idor_lens/cli.py`
+  - Published schema: `docs/idor-lens.schema.json`
+  - Tests: `tests/test_schema.py`
+  - Verification: `make check` (pass); `.venv/bin/python -m idor_lens schema --out - | head` (pass)
+- Commit: `edc2363`
+- Confidence: medium-high
+- Trust label: verified-local
+
+## 2026-02-10 - Verification Evidence (Cycle 1)
+
+- `make check` (pass)
+- `.venv/bin/python -m idor_lens --help` (pass)
+- `.venv/bin/python -m idor_lens schema --out - | head` (pass)
+- `.venv/bin/python -m idor_lens init --out - --base-url https://example.test | head` (pass)
+- `gh run list --limit 15` (pass; recent runs all successful)
+
 ## 2026-02-09 - Streaming Response Reads
 
 - Decision: Read response bodies via streaming iteration (still hashing/sampling up to `--max-bytes`) to avoid buffering large responses in memory.

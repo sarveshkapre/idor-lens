@@ -9,8 +9,6 @@
 ## Candidate Features To Do
 - [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
   - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=medium-low.
-- [ ] P2: Add richer allow/deny heuristics beyond status codes (e.g. `allow_contains`/`allow_regex` + optional header/content-length matching), to reduce false positives on apps that return 2xx deny pages and false negatives on apps that use 404-on-deny patterns.
-  - Score: impact=high, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium.
 - [ ] P2: Add a debug mode that logs outgoing requests (method/url/headers and small body sample) with redaction rules, to speed up spec iteration without opening Burp.
   - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
 - [ ] P2: Add an optional token refresh command helper (`auth_command`) with explicit opt-in guardrails for long scans where `auth_file` is inconvenient.
@@ -19,12 +17,14 @@
   - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
 - [ ] P3: Add multi-role support (more than victim/attacker) to allow authorization matrices similar to common Burp workflows.
   - Score: impact=medium, effort=high, fit=medium, differentiation=high, risk=high, confidence=low.
-- [ ] P3: Publish a JSON Schema for the YAML spec (and/or `idor-lens schema --out -`) for editor IntelliSense and downstream validation.
-  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=low, confidence=medium.
 - [ ] P3: Add a `--strict-status`/`--deny-statuses` control to treat non-2xx patterns explicitly (useful when targets use 404/200 in unusual ways).
   - Score: impact=low-medium, effort=low-medium, fit=medium, differentiation=low, risk=low, confidence=medium.
 
 ## Implemented
+- [x] 2026-02-10: Added `allow_contains` / `allow_regex` heuristics (spec-level + per-endpoint) to reduce status-only false positives when attacker receives a 2xx denial page.
+  Evidence: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/report.py`, `src/idor_lens/template.py`, `docs/spec-cookbook.md`, `README.md`, `tests/test_runner.py`, `tests/test_validate.py`; gate: `make check`; commit: `8ae1d6e`.
+- [x] 2026-02-10: Published a JSON Schema for the YAML spec and added `idor-lens schema --out -` for editor IntelliSense and downstream validation.
+  Evidence: `src/idor_lens/schema.py`, `src/idor_lens/cli.py`, `docs/idor-lens.schema.json`, `tests/test_schema.py`, `README.md`, `CHANGELOG.md`; gate: `make check`; commit: `edc2363`.
 - [x] 2026-02-09: Added `idor-lens run --only-name/--only-path` filters to run a subset of endpoints for faster iteration.
   Evidence: `src/idor_lens/cli.py`, `src/idor_lens/runner.py`, `tests/test_runner.py`, `README.md`, `CHANGELOG.md`; gate: `make check`.
 - [x] 2026-02-09: Added `--max-response-bytes` to cap response reads (prevents hanging on huge/streaming endpoints); surfaced in JSONL and HTML report details.
@@ -71,7 +71,9 @@
 - Naming scan scenarios in specs (`endpoints[].name`) makes regression output materially clearer when multiple checks hit the same path.
 - JSONL tooling benefits from explicit parse-location errors because report/compare/summarize are often run in CI where raw tracebacks are noisy.
 - Payload mode defaults must stay explicit and deterministic to keep scan reproducibility high across differing API stacks.
-- Market scan (untrusted web signal): established workflows emphasize (1) role/session realism, (2) response diffing beyond status codes, and (3) CI/security-dashboard friendly exports.
+- Allow heuristics are a practical middle ground between status-only signals and full strict-body matching: they reduce noisy 2xx denial page false positives without requiring full response equivalence.
+- JSON Schema output is disproportionately valuable for adoption: it shortens the "write a spec" loop via editor IntelliSense and reduces typo-driven failures.
+- Market scan (untrusted web signal, refreshed 2026-02-10): established workflows emphasize (1) role/session realism, (2) response diffing beyond status codes, and (3) CI/security-dashboard friendly exports.
   - Burp Suite extensions commonly used for authorization testing: AuthMatrix and Autorize.
     - https://portswigger.net/bappstore/cbff8e57c1cf4c66af0d9c1c0a6d6e1b (AuthMatrix)
     - https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f (Autorize)

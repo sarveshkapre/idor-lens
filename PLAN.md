@@ -61,9 +61,14 @@ python -m idor_lens --help
 - Added configurable deny-response heuristics via `deny_contains` / `deny_regex` to reduce false positives on noisy targets.
 - Added `json_ignore_paths` for strict body matching on JSON APIs with known-dynamic fields (best-effort).
 
+## Shipped (2026-02-10)
+
+- Added allow-response heuristics via `allow_contains` / `allow_regex` to reduce status-only false positives when attacker receives a 2xx denial page.
+- Published a JSON Schema for the YAML spec and added `idor-lens schema` for editor IntelliSense.
+
 ## Next (tight scope)
 
-- Expand beyond status-only signals with richer allow/deny heuristics (to reduce false positives/negatives).
+- Expand beyond status-only signals with richer allow/deny heuristics (to reduce false positives/negatives; potentially include header/content-length signals).
 - Add parametrized endpoint matrices (intruder-style ID substitution) to improve coverage.
 
 ## Non-goals (near-term)
