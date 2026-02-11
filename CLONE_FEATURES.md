@@ -7,20 +7,32 @@
 - Gaps found during codebase exploration
 
 ## Candidate Features To Do
-- [ ] P2: Add parametrized endpoint matrices (intruder-style ID substitution over path/query/body) to increase coverage.
-  - Score: impact=high, effort=high, fit=high, differentiation=high, risk=medium, confidence=medium-low.
-- [ ] P2: Add a debug mode that logs outgoing requests (method/url/headers and small body sample) with redaction rules, to speed up spec iteration without opening Burp.
+- [ ] P1: Add explicit status heuristics (`allow_statuses` / `deny_statuses`) for apps that encode access control in non-2xx patterns.
+  - Score: impact=medium-high, effort=medium, fit=high, differentiation=medium, risk=low, confidence=medium.
+- [ ] P1: Add `--debug-requests` mode with redacted request/response metadata (method/url/status/body sample) to reduce spec iteration time.
   - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
-- [ ] P2: Add an optional token refresh command helper (`auth_command`) with explicit opt-in guardrails for long scans where `auth_file` is inconvenient.
-  - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium-low.
-- [ ] P3: Add lightweight endpoint batching/parallelism with rate-limit-aware controls (max in-flight, 429 backoff).
+- [ ] P2: Add lightweight endpoint batching/parallelism (`--max-in-flight`) with conservative defaults.
   - Score: impact=medium, effort=high, fit=medium, differentiation=medium, risk=high, confidence=low.
-- [ ] P3: Add multi-role support (more than victim/attacker) to allow authorization matrices similar to common Burp workflows.
+- [ ] P2: Add adaptive rate-limit behavior (`Retry-After` respect + jittered backoff caps) for noisy APIs/WAFs.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=low, risk=medium, confidence=medium.
+- [ ] P2: Add optional `auth_command` token refresh helper with explicit opt-in and execution timeout guardrails.
+  - Score: impact=medium, effort=medium, fit=high, differentiation=medium, risk=medium, confidence=medium-low.
+- [ ] P2: Add endpoint tags and `--only-tag` selector for large specs (complements `--only-name`/`--only-path`).
+  - Score: impact=medium, effort=low-medium, fit=high, differentiation=low, risk=low, confidence=high.
+- [ ] P2: Add per-endpoint request fingerprinting controls (header/body/content-length signals) to reduce false positives on template-heavy denial pages.
+  - Score: impact=medium, effort=medium-high, fit=high, differentiation=medium, risk=medium, confidence=medium-low.
+- [ ] P2: Add a `baseline` helper command to capture/version canonical JSONL snapshots for easier compare workflows.
+  - Score: impact=low-medium, effort=low, fit=medium, differentiation=low, risk=low, confidence=high.
+- [ ] P3: Add multi-role authorization matrix support (>2 roles) while keeping victim/attacker shorthand backward compatible.
   - Score: impact=medium, effort=high, fit=medium, differentiation=high, risk=high, confidence=low.
-- [ ] P3: Add a `--strict-status`/`--deny-statuses` control to treat non-2xx patterns explicitly (useful when targets use 404/200 in unusual ways).
-  - Score: impact=low-medium, effort=low-medium, fit=medium, differentiation=low, risk=low, confidence=medium.
+- [ ] P3: Add richer HTML report faceting (filter by reason/confidence/role outcome) for faster analyst triage.
+  - Score: impact=low-medium, effort=medium, fit=medium, differentiation=low, risk=low, confidence=medium.
+- [ ] P3: Add optional response artifact capture for failing scenarios (small sample snapshots) with secret-safe redaction.
+  - Score: impact=low-medium, effort=medium, fit=medium, differentiation=low, risk=medium, confidence=medium-low.
 
 ## Implemented
+- [x] 2026-02-11: Added endpoint `matrix` expansion with `{{var}}` placeholders (path/query/body/name/header/cookie), plus `matrix_values` in findings and compare/summarize keying for stable per-variant regression tracking.
+  Evidence: `src/idor_lens/matrix.py`, `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/findings.py`, `src/idor_lens/report.py`, `src/idor_lens/schema.py`, `docs/idor-lens.schema.json`, `src/idor_lens/template.py`, `README.md`, `docs/spec-cookbook.md`, `tests/test_runner.py`, `tests/test_validate.py`, `tests/test_compare.py`, `tests/test_summarize.py`, `tests/test_smoke.py`; gate: `make check`; local smoke: `.venv/bin/python -m idor_lens run ...` + `.venv/bin/python -m idor_lens summarize ...`; commit: `TBD`.
 - [x] 2026-02-10: Added `allow_contains` / `allow_regex` heuristics (spec-level + per-endpoint) to reduce status-only false positives when attacker receives a 2xx denial page.
   Evidence: `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/report.py`, `src/idor_lens/template.py`, `docs/spec-cookbook.md`, `README.md`, `tests/test_runner.py`, `tests/test_validate.py`; gate: `make check`; commit: `8ae1d6e`.
 - [x] 2026-02-10: Published a JSON Schema for the YAML spec and added `idor-lens schema --out -` for editor IntelliSense and downstream validation.
@@ -67,25 +79,22 @@
   Evidence: `README.md`, `CHANGELOG.md`, `PLAN.md`, `ROADMAP.md`, `UPDATE.md`; commands: `make check`, local CLI smoke run against `python -m http.server`.
 
 ## Insights
+- Gap map (2026-02-11): `missing`=intruder-style parameterized coverage (closed this cycle via endpoint matrix support), `weak`=status semantics for non-2xx denial patterns, `parity`=CI exports (JUnit/SARIF + compare), `differentiator opportunity`=rate-limit-aware parallelism plus rich deny/allow signal controls.
 - Schema drift between `run` and `validate` was a practical reliability risk; mirroring runtime-critical checks in `validate` prevents avoidable scan-time failures.
 - Naming scan scenarios in specs (`endpoints[].name`) makes regression output materially clearer when multiple checks hit the same path.
 - JSONL tooling benefits from explicit parse-location errors because report/compare/summarize are often run in CI where raw tracebacks are noisy.
 - Payload mode defaults must stay explicit and deterministic to keep scan reproducibility high across differing API stacks.
 - Allow heuristics are a practical middle ground between status-only signals and full strict-body matching: they reduce noisy 2xx denial page false positives without requiring full response equivalence.
 - JSON Schema output is disproportionately valuable for adoption: it shortens the "write a spec" loop via editor IntelliSense and reduces typo-driven failures.
-- Market scan (untrusted web signal, refreshed 2026-02-10): established workflows emphasize (1) role/session realism, (2) response diffing beyond status codes, and (3) CI/security-dashboard friendly exports.
-  - Burp Suite extensions commonly used for authorization testing: AuthMatrix and Autorize.
-    - https://portswigger.net/bappstore/cbff8e57c1cf4c66af0d9c1c0a6d6e1b (AuthMatrix)
-    - https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f (Autorize)
-  - AuthMatrix/Autorize UX patterns worth matching (non-proprietary patterns): fast "replay" of a single request across roles, explicit allow/deny signals beyond status codes, and summarizing mismatches by endpoint key.
+- Market scan (untrusted web signal, refreshed 2026-02-11): established workflows emphasize (1) role/session realism, (2) response diffing beyond status codes, and (3) CI/security-dashboard friendly exports.
+  - Burp Suite extension patterns for authorization testing emphasize matrix-style request replay across users and mismatch-focused reporting.
     - https://github.com/PortSwigger/auth-matrix (AuthMatrix docs)
-    - https://github.com/PortSwigger/autorize (Autorize docs)
+    - https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f (Autorize listing)
+  - Baseline problem framing remains IDOR/BOLA-focused in PortSwigger and OWASP guidance.
+    - https://portswigger.net/web-security/access-control/idor
+    - https://owasp.org/API-Security/editions/2023/en/0x11-t10/
   - Additional authorization-testing extension patterns (untrusted web signal): enforcement detectors often support fingerprints in body/headers and/or content-length-based matching, plus per-user vs global rules.
     - https://github.com/emanuelfc/Authorize (Authorize extension)
-  - PortSwigger Web Security Academy guidance: Insecure direct object references (IDOR).
-    - https://portswigger.net/web-security/access-control/idor
-  - OWASP API Security Top 10: API1:2023 Broken Object Level Authorization (BOLA), the API-world equivalent of IDOR.
-    - https://owasp.org/API-Security/editions/2023/en/0x11-t10/
   - SARIF 2.1.0 is a common interchange format for ingesting scan results (e.g. GitHub code scanning).
     - https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 

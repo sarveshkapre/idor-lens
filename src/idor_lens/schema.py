@@ -96,6 +96,11 @@ def spec_schema() -> dict[str, Any]:
             "allow_contains": {"type": "array", "items": non_empty_str},
             "allow_regex": {"type": "array", "items": non_empty_str},
             "json_ignore_paths": {"type": "array", "items": non_empty_str},
+            "matrix": {
+                "type": "object",
+                "propertyNames": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+                "additionalProperties": {"type": "array", "items": {}, "minItems": 1},
+            },
             "body_mode": body_mode,
             "victim_body_mode": body_mode,
             "attacker_body_mode": body_mode,

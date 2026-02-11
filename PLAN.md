@@ -66,10 +66,16 @@ python -m idor_lens --help
 - Added allow-response heuristics via `allow_contains` / `allow_regex` to reduce status-only false positives when attacker receives a 2xx denial page.
 - Published a JSON Schema for the YAML spec and added `idor-lens schema` for editor IntelliSense.
 
+## Shipped (2026-02-11)
+
+- Added endpoint `matrix` expansion for intruder-style ID substitution across path/query/body/name/header/cookie fields.
+- Added `matrix_values` in findings and compare/summarize keying to keep variant-level regression tracking stable.
+- Added matrix schema/validation guardrails and docs/template examples.
+
 ## Next (tight scope)
 
 - Expand beyond status-only signals with richer allow/deny heuristics (to reduce false positives/negatives; potentially include header/content-length signals).
-- Add parametrized endpoint matrices (intruder-style ID substitution) to improve coverage.
+- Expand matrix ergonomics (for example endpoint tags and additional variant controls) now that baseline matrix support is shipped.
 
 ## Non-goals (near-term)
 

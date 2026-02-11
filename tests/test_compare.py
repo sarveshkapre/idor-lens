@@ -79,3 +79,25 @@ def test_compare_prefers_name_for_keys(tmp_path: Path) -> None:
 
     summary = compare_jsonl(baseline, current)
     assert summary.new_vulnerable == ["GET scenario one"]
+
+
+def test_compare_keys_include_matrix_values(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.jsonl"
+    baseline.write_text("", encoding="utf-8")
+    current = tmp_path / "current.jsonl"
+    current.write_text(
+        "\n".join(
+            [
+                '{"name":"item-check","endpoint":"/items/1","method":"GET","vulnerable":true,"confidence":"high","matrix_values":{"item_id":101}}',
+                '{"name":"item-check","endpoint":"/items/1","method":"GET","vulnerable":true,"confidence":"high","matrix_values":{"item_id":102}}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = compare_jsonl(baseline, current)
+    assert summary.new_vulnerable == [
+        "GET item-check [item_id=101]",
+        "GET item-check [item_id=102]",
+    ]

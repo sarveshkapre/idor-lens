@@ -49,3 +49,13 @@ def test_summarize_prefers_name_for_keys(tmp_path: Path) -> None:
     )
     s = summarize_jsonl(inp, min_confidence="high")
     assert s.vulnerable_keys == ["GET scenario one"]
+
+
+def test_summarize_keys_include_matrix_values(tmp_path: Path) -> None:
+    inp = tmp_path / "in.jsonl"
+    inp.write_text(
+        '{"name":"scenario one","endpoint":"/a","method":"GET","vulnerable":true,"confidence":"high","matrix_values":{"item_id":7,"owner":"alice"}}\n',
+        encoding="utf-8",
+    )
+    s = summarize_jsonl(inp, min_confidence="high")
+    assert s.vulnerable_keys == ['GET scenario one [item_id=7, owner="alice"]']

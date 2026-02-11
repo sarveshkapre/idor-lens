@@ -158,3 +158,73 @@ def test_cli_replay_by_name_smoke(tmp_path: Path) -> None:
         assert row["name"] == "two"
     finally:
         server.shutdown()
+
+
+def test_cli_run_with_endpoint_matrix_smoke(tmp_path: Path) -> None:
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:  # noqa: N802 - http.server naming
+            if self.path not in ("/items/101", "/items/102"):
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"not found")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    _addr, port = sock.getsockname()
+    sock.close()
+
+    server = HTTPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{port}"
+        spec = tmp_path / "spec.yml"
+        out = tmp_path / "out.jsonl"
+        spec.write_text(
+            "base_url: "
+            + base_url
+            + "\n"
+            + "victim:\n  auth: Bearer victim\n"
+            + "attacker:\n  auth: Bearer attacker\n"
+            + "endpoints:\n"
+            + "  - name: item-{{item_id}}\n"
+            + "    path: /items/{{item_id}}\n"
+            + "    method: GET\n"
+            + "    matrix:\n"
+            + "      item_id: [101, 102]\n",
+            encoding="utf-8",
+        )
+
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "idor_lens",
+                "run",
+                "--spec",
+                str(spec),
+                "--out",
+                str(out),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, proc.stderr
+
+        rows = [json.loads(line) for line in out.read_text(encoding="utf-8").strip().splitlines()]
+        assert len(rows) == 2
+        assert {"item_id": 101} in [row.get("matrix_values") for row in rows]
+        assert {"item_id": 102} in [row.get("matrix_values") for row in rows]
+    finally:
+        server.shutdown()

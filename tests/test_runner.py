@@ -134,6 +134,59 @@ def test_only_filters_require_match(tmp_path: Path, monkeypatch: MonkeyPatch) ->
         run_test(spec, out, timeout=1.0, only_names=["does-not-exist"])
 
 
+def test_endpoint_matrix_expands_path_query_and_body(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    seen_urls: list[str] = []
+    seen_bodies: list[dict[str, Any]] = []
+
+    def fake_request(*args: Any, **kwargs: Any) -> _Resp:
+        seen_urls.append(str(args[2]))
+        body = kwargs.get("json")
+        if isinstance(body, dict):
+            seen_bodies.append(body)
+        return _Resp(200, b'{"ok":true}')
+
+    monkeypatch.setattr(requests.sessions.Session, "request", fake_request)
+
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "victim:\n  auth: Bearer victim\n"
+        "attacker:\n  auth: Bearer attacker\n"
+        "endpoints:\n"
+        "  - name: item-{{item_id}}-{{owner}}\n"
+        "    path: /items/{{item_id}}?owner={{owner}}\n"
+        "    method: POST\n"
+        "    victim_body:\n"
+        "      id: '{{item_id}}'\n"
+        "      owner: '{{owner}}'\n"
+        "    attacker_body:\n"
+        "      id: '{{item_id}}'\n"
+        "      owner: '{{owner}}'\n"
+        "    matrix:\n"
+        "      item_id: [101, 102]\n"
+        "      owner: [alice, bob]\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    run_test(spec, out, timeout=1.0)
+
+    # 2x2 matrix expansions => 4 endpoint findings and 8 outbound requests.
+    assert len(seen_urls) == 8
+    assert len(set(seen_urls)) == 4
+    assert any(url.endswith("/items/101?owner=alice") for url in seen_urls)
+    assert any(url.endswith("/items/102?owner=bob") for url in seen_urls)
+    assert {"id": 101, "owner": "alice"} in seen_bodies
+    assert {"id": 102, "owner": "bob"} in seen_bodies
+
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").strip().splitlines()]
+    assert len(rows) == 4
+    assert all(isinstance(row.get("matrix_values"), dict) for row in rows)
+    assert {"item_id": 101, "owner": "alice"} in [row["matrix_values"] for row in rows]
+    assert {"item_id": 102, "owner": "bob"} in [row["matrix_values"] for row in rows]
+
+
 def test_max_response_bytes_caps_reads(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     class _StreamResp:
         def __init__(self, status_code: int) -> None:

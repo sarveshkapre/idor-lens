@@ -366,6 +366,18 @@
             },
             "type": "array"
           },
+          "matrix": {
+            "additionalProperties": {
+              "items": {},
+              "minItems": 1,
+              "type": "array"
+            },
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            "type": "object"
+          },
           "method": {
             "minLength": 1,
             "type": "string"

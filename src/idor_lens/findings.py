@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping
 
 
@@ -22,6 +23,7 @@ def key(item: Mapping[str, Any]) -> str:
     name = item.get("name")
     endpoint = item.get("endpoint")
     url = item.get("url")
+    matrix_suffix = _matrix_suffix(item)
 
     if isinstance(method, str):
         m = method.upper()
@@ -29,12 +31,30 @@ def key(item: Mapping[str, Any]) -> str:
         m = "GET"
 
     if isinstance(name, str) and name:
-        return f"{m} {name}"
+        return f"{m} {name}{matrix_suffix}"
     if isinstance(endpoint, str) and endpoint:
-        return f"{m} {endpoint}"
+        return f"{m} {endpoint}{matrix_suffix}"
     if isinstance(url, str) and url:
-        return f"{m} {url}"
-    return m
+        return f"{m} {url}{matrix_suffix}"
+    return f"{m}{matrix_suffix}"
+
+
+def _matrix_suffix(item: Mapping[str, Any]) -> str:
+    raw = item.get("matrix_values")
+    if not isinstance(raw, Mapping) or not raw:
+        return ""
+
+    parts: list[str] = []
+    for key in sorted(raw):
+        value = raw[key]
+        try:
+            rendered = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        except TypeError:
+            rendered = str(value)
+        parts.append(f"{key}={rendered}")
+    if not parts:
+        return ""
+    return " [" + ", ".join(parts) + "]"
 
 
 def is_vulnerable(item: Mapping[str, Any], *, min_rank: int) -> bool:

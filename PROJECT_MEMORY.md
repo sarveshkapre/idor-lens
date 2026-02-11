@@ -1,5 +1,63 @@
 # PROJECT_MEMORY
 
+## 2026-02-11 - Endpoint Matrix Expansion For Coverage
+
+- Decision: Add endpoint `matrix` expansion with `{{var}}` placeholders to generate cartesian endpoint variants across path/query/body/name/header/cookie fields.
+- Why: Spec-authoring effort was a top coverage bottleneck; intruder-style parameterization materially increases object-level authorization coverage without duplicating endpoint definitions.
+- Evidence:
+  - Implementation: `src/idor_lens/matrix.py`, `src/idor_lens/runner.py`, `src/idor_lens/validate.py`, `src/idor_lens/schema.py`
+  - Keying/triage: `src/idor_lens/findings.py`, `src/idor_lens/report.py`
+  - Docs: `README.md`, `docs/spec-cookbook.md`, `src/idor_lens/template.py`, `PLAN.md`, `ROADMAP.md`, `CHANGELOG.md`
+  - Tests: `tests/test_runner.py`, `tests/test_validate.py`, `tests/test_compare.py`, `tests/test_summarize.py`, `tests/test_smoke.py`
+  - Verification: `make check` (pass); local CLI smoke matrix run + summarize (pass)
+- Commit: `TBD`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-11 - Decision: Matrix Values In Regression Keys
+
+- Decision: Include `matrix_values` in findings and append them to compare/summarize keys when present.
+- Why: Without variant identity in keys, matrix-expanded runs with shared path/name can collapse in regression output and hide variant-specific results.
+- Evidence:
+  - Implementation: `src/idor_lens/runner.py`, `src/idor_lens/findings.py`
+  - Tests: `tests/test_compare.py::test_compare_keys_include_matrix_values`, `tests/test_summarize.py::test_summarize_keys_include_matrix_values`
+  - Verification: `make check` (pass); local summarize output includes matrix-qualified keys (pass)
+- Commit: `TBD`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-11 - Market Scan Snapshot (Bounded)
+
+- Decision: Prioritize matrix-style coverage in this cycle, then keep status-heuristic and parallelism work as next backlog.
+- Why: External signals consistently emphasize authorization matrix replay and BOLA/IDOR coverage breadth as baseline expectations.
+- Evidence (untrusted web signal):
+  - AuthMatrix repository (matrix-style authorization testing workflow): https://github.com/PortSwigger/auth-matrix
+  - Autorize listing (authorization replay extension signal): https://portswigger.net/bappstore/f9bbac8c4acf4aefa4d7dc92a991af2f
+  - PortSwigger IDOR guidance: https://portswigger.net/web-security/access-control/idor
+  - OWASP API1:2023 BOLA guidance: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
+- Commit: `TBD`
+- Confidence: medium
+- Trust label: untrusted-web
+
+## 2026-02-11 - Mistake: Initial Smoke Script Race (Fixed)
+
+- Root cause: A shell-based smoke script attempted to read a dynamically written port file before it existed, producing an invalid spec URL.
+- Fix: Replaced the ad-hoc shell orchestration with a single Python smoke harness that starts the server thread, runs CLI commands, and shuts down deterministically.
+- Prevention rule: For local integration checks requiring ephemeral ports/processes, prefer one-process Python harnesses over multi-step shell background orchestration.
+- Evidence: one failed shell smoke attempt, followed by successful `.venv/bin/python - <<'PY' ...` CLI smoke harness.
+- Commit: `TBD`
+- Confidence: high
+- Trust label: verified-local
+
+## 2026-02-11 - Verification Evidence (Cycle 1)
+
+- `.venv/bin/python -m idor_lens schema --out docs/idor-lens.schema.json` (pass)
+- `.venv/bin/pytest -q tests/test_validate.py tests/test_runner.py tests/test_compare.py tests/test_summarize.py tests/test_smoke.py` (pass)
+- `make check` (pass)
+- `.venv/bin/python - <<'PY' ... matrix smoke harness running \`idor_lens run\` + \`idor_lens summarize\` ...` (pass)
+- `gh issue list --limit 100 --state open --json number,title,author,labels,updatedAt` (pass; no open issues)
+- `gh run list --limit 20 --json databaseId,headBranch,headSha,name,status,conclusion,workflowName,createdAt,updatedAt` (pass; recent runs successful)
+
 ## 2026-02-10 - Allow Heuristics For Noisy 2xx Denial Pages
 
 - Decision: Add `allow_contains` / `allow_regex` heuristics (spec-level + per-endpoint) and treat a role as "allowed" only when `2xx AND allow_match AND NOT deny_match` when allow heuristics are configured.

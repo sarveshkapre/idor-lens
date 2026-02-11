@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from .matrix import expand_endpoints
 from .json_paths import apply_ignore_paths
 from .spec import load_spec
 
@@ -67,6 +68,7 @@ class Finding:
     attacker_allow_match: bool | None
     victim_response_capped: bool
     attacker_response_capped: bool
+    matrix_values: dict[str, Any] | None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -99,6 +101,7 @@ class Finding:
             "attacker_allow_match": self.attacker_allow_match,
             "victim_response_capped": self.victim_response_capped,
             "attacker_response_capped": self.attacker_response_capped,
+            "matrix_values": self.matrix_values,
         }
 
 
@@ -626,9 +629,10 @@ def run_test(
     if not isinstance(attacker, dict):
         raise SystemExit("attacker must be a mapping")
 
-    endpoints = spec.get("endpoints", [])
-    if not isinstance(endpoints, list) or not endpoints:
+    endpoints_raw = spec.get("endpoints", [])
+    if not isinstance(endpoints_raw, list) or not endpoints_raw:
         raise SystemExit("spec must include endpoints list")
+    endpoints = expand_endpoints(endpoints_raw)
 
     if max_bytes <= 0:
         raise SystemExit("--max-bytes must be > 0")
@@ -829,8 +833,6 @@ def run_test(
     try:
         out = out_handle if out_handle is not None else sys.stdout
         for idx, ep in enumerate(endpoints, start=1):
-            if not isinstance(ep, dict):
-                raise SystemExit("each endpoints[] entry must be a mapping")
             path = ep.get("path")
             if not isinstance(path, str) or not path:
                 raise SystemExit("endpoint path must be a non-empty string")
@@ -1123,6 +1125,8 @@ def run_test(
             if vulnerable:
                 found_vulns += 1
 
+            matrix_values_raw = ep.get("matrix_values")
+            matrix_values = matrix_values_raw if isinstance(matrix_values_raw, dict) else None
             finding = Finding(
                 endpoint=path,
                 name=endpoint_name,
@@ -1153,6 +1157,7 @@ def run_test(
                 attacker_allow_match=(bool(a.allow_match) if allow_required else None),
                 victim_response_capped=bool(v.response_capped),
                 attacker_response_capped=bool(a.response_capped),
+                matrix_values=matrix_values,
             )
             out.write(json.dumps(finding.to_dict()) + "\n")
 

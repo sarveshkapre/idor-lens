@@ -93,6 +93,7 @@ Tips:
 - For huge/streaming endpoints, use `--max-response-bytes N` to stop reading after N bytes (prevents scans hanging on infinite streams).
 - Use endpoint `name` to label scenarios; compare/summarize keys prefer this when present.
 - For faster iteration, run a subset of endpoints with `idor-lens run --only-name ...` / `--only-path ...` (repeat flags to select multiple).
+- For intruder-style coverage, use endpoint `matrix` values with `{{var}}` placeholders to expand a single endpoint definition into multiple ID scenarios.
 - Use endpoint/preflight `body_mode` when targets expect non-JSON payloads (`json`/`form`/`raw`).
 - Use `--out -` to stream JSONL to stdout.
 - Use `--fail-on-vuln` for CI/regression.
@@ -143,6 +144,32 @@ Notes:
 - Defaults when omitted:
   - `form` => `Content-Type: application/x-www-form-urlencoded`
   - `raw` => `Content-Type: text/plain; charset=utf-8`
+
+### Endpoint matrices (`{{var}}` placeholders)
+
+Expand one endpoint definition across multiple object IDs or dimensions:
+
+```yaml
+endpoints:
+  - name: item-read-{{item_id}}-{{owner}}
+    path: /items/{{item_id}}?owner={{owner}}
+    method: POST
+    victim_body:
+      id: "{{item_id}}"
+      owner: "{{owner}}"
+    attacker_body:
+      id: "{{item_id}}"
+      owner: "{{owner}}"
+    matrix:
+      item_id: [101, 102]
+      owner: [alice, bob]
+```
+
+Notes:
+
+- Matrix expansion is cartesian product (`2 x 2 => 4` endpoint runs).
+- Placeholder syntax is `{{var}}`; matrix variable names must match `^[A-Za-z_][A-Za-z0-9_]*$`.
+- JSONL findings include `matrix_values` so compare/summarize keys stay unique per variant.
 
 ## HTML report
 

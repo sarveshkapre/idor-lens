@@ -103,6 +103,31 @@ endpoints:
     attacker_body: '{"id":123}'
 ```
 
+## Endpoint Matrix Expansion (Intruder-Style ID Substitution)
+
+Use `matrix` + `{{var}}` placeholders to run one endpoint definition across many IDs:
+
+```yaml
+endpoints:
+  - name: item-read-{{item_id}}-{{owner}}
+    path: /items/{{item_id}}?owner={{owner}}
+    method: POST
+    victim_body:
+      id: "{{item_id}}"
+      owner: "{{owner}}"
+    attacker_body:
+      id: "{{item_id}}"
+      owner: "{{owner}}"
+    matrix:
+      item_id: [101, 102]
+      owner: [alice, bob]
+```
+
+Behavior notes:
+- Expansion is cartesian product (`2 x 2 => 4` endpoint runs).
+- Variable names must match `^[A-Za-z_][A-Za-z0-9_]*$`.
+- Findings include `matrix_values` for per-variant triage and compare/summarize key stability.
+
 ## Deny Heuristics For 2xx Denial Pages
 
 Some targets return a 2xx "access denied" page. Use deny heuristics to avoid status-only false positives:

@@ -178,6 +178,73 @@ def test_validate_accepts_allow_heuristics(tmp_path: Path) -> None:
     assert validate_spec(spec, require_env=True) == 0
 
 
+def test_validate_accepts_endpoint_matrix(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "endpoints:\n"
+        "  - name: item-{{item_id}}\n"
+        "    path: /items/{{item_id}}?owner={{owner}}\n"
+        "    victim_body:\n"
+        "      id: '{{item_id}}'\n"
+        "      owner: '{{owner}}'\n"
+        "    attacker_body:\n"
+        "      id: '{{item_id}}'\n"
+        "      owner: '{{owner}}'\n"
+        "    matrix:\n"
+        "      item_id: [101, 102]\n"
+        "      owner: [alice, bob]\n",
+        encoding="utf-8",
+    )
+    assert validate_spec(spec, require_env=True) == 0
+
+
+def test_validate_rejects_unknown_matrix_placeholder(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "endpoints:\n"
+        "  - path: /items/{{missing}}\n"
+        "    matrix:\n"
+        "      item_id: [1]\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        SystemExit, match="endpoints\\[1\\]\\.path contains unknown matrix placeholders: missing"
+    ):
+        validate_spec(spec, require_env=True)
+
+
+def test_validate_rejects_invalid_matrix_key(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "endpoints:\n"
+        "  - path: /items/1\n"
+        "    matrix:\n"
+        "      bad-key: [1]\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="endpoints\\[1\\]\\.matrix keys must match"):
+        validate_spec(spec, require_env=True)
+
+
+def test_validate_rejects_empty_matrix_values(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.yml"
+    spec.write_text(
+        "base_url: https://example.test\n"
+        "endpoints:\n"
+        "  - path: /items/1\n"
+        "    matrix:\n"
+        "      item_id: []\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        SystemExit, match="endpoints\\[1\\]\\.matrix\\.item_id must be a non-empty list"
+    ):
+        validate_spec(spec, require_env=True)
+
+
 def test_validate_rejects_invalid_deny_regex(tmp_path: Path) -> None:
     spec = tmp_path / "spec.yml"
     spec.write_text(

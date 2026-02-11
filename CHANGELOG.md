@@ -8,6 +8,7 @@
 - `idor-lens compare` compares baseline vs current JSONL (regression mode).
 - `idor-lens replay` replays a single endpoint from a spec (victim vs attacker) for debugging.
 - `idor-lens run --only-name/--only-path` filters to run a subset of endpoints for faster iteration.
+- Endpoint `matrix` expansion with `{{var}}` placeholders for intruder-style path/query/body permutations.
 - `idor-lens run --max-response-bytes` to cap response reads (prevents hanging on huge/streaming endpoints).
 - `idor-lens junit` writes JUnit XML from JSONL output (CI ingestion).
 - `idor-lens sarif` writes SARIF 2.1.0 from JSONL output (security dashboard ingestion).
@@ -17,6 +18,7 @@
 - `victim/attacker.auth_file` reads the full `Authorization` header value from a file per request (token rotation helper).
 - Endpoint-level cookie overrides via `endpoints[].cookies`, `victim_cookies`, and `attacker_cookies`.
 - Optional endpoint `name` field in findings; compare/summarize now key by `name` when provided.
+- Findings now include optional `matrix_values`; compare/summarize keys include matrix values when present.
 - Endpoint and preflight payload modes via `body_mode` (`json`, `form`, `raw`).
 - Endpoint payload `content_type` controls with per-role overrides (`victim_content_type`, `attacker_content_type`).
 - Endpoint per-role payload mode overrides via `victim_body_mode` and `attacker_body_mode`.

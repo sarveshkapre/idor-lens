@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .json_paths import parse_ignore_path
+from .matrix import expand_endpoint_matrix
 from .spec import find_unexpanded_env_vars, load_spec
 
 _BODY_MODE_JSON = "json"
@@ -200,6 +201,12 @@ def _validate_role(value: Any, *, name: str) -> Mapping[str, Any]:
 def _validate_endpoint(value: Any, *, idx: int) -> None:
     name = f"endpoints[{idx}]"
     endpoint = _as_mapping(value, name=name)
+    expanded = expand_endpoint_matrix(dict(endpoint), endpoint_index=idx)
+    for candidate in expanded:
+        _validate_expanded_endpoint(candidate, name=name)
+
+
+def _validate_expanded_endpoint(endpoint: Mapping[str, Any], *, name: str) -> None:
     _require_non_empty_str(endpoint.get("path"), name=f"{name}.path")
     method = endpoint.get("method")
     if method is not None:

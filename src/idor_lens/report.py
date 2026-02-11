@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
@@ -40,6 +41,7 @@ class ReportRow:
     attacker_allow_match: bool | None
     victim_response_capped: bool | None
     attacker_response_capped: bool | None
+    matrix_values: dict[str, Any] | None
 
 
 def _as_bool(value: Any, *, default: bool = False) -> bool:
@@ -127,6 +129,7 @@ def _to_report_row(d: dict[str, Any]) -> ReportRow:
         attacker_response_capped=d.get("attacker_response_capped")
         if isinstance(d.get("attacker_response_capped"), bool)
         else None,
+        matrix_values=d.get("matrix_values") if isinstance(d.get("matrix_values"), dict) else None,
     )
 
 
@@ -242,6 +245,11 @@ def _render_html(
             details_bits.append(
                 f"<div><span class='k'>Attacker response capped</span> {str(r.attacker_response_capped).lower()}</div>"
             )
+        if r.matrix_values:
+            details_bits.append(
+                "<div><span class='k'>Matrix values</span> "
+                f"<code>{escape(json.dumps(r.matrix_values, sort_keys=True, ensure_ascii=False))}</code></div>"
+            )
 
         details_html = ""
         if details_bits:
@@ -253,7 +261,14 @@ def _render_html(
             )
 
         # Data attributes for client-side filtering.
-        searchable = " ".join([r.name, r.endpoint, r.method, r.url, r.reason, r.confidence]).lower()
+        matrix_search = (
+            json.dumps(r.matrix_values, sort_keys=True, ensure_ascii=False)
+            if r.matrix_values
+            else ""
+        )
+        searchable = " ".join(
+            [r.name, r.endpoint, r.method, r.url, r.reason, r.confidence, matrix_search]
+        ).lower()
         row_html.append(
             "<tr "
             f"data-idx='{idx}' "

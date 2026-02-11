@@ -1,3 +1,25 @@
+# Update (2026-02-11)
+
+## Summary
+
+- Added endpoint `matrix` expansion (`{{var}}` placeholders) to generate cartesian path/query/body/name/header/cookie variants from a single endpoint definition.
+- Added `matrix_values` to findings and included them in compare/summarize keying to preserve per-variant regression fidelity.
+- Added matrix schema + validation guardrails and updated template/docs for matrix authoring.
+
+## Verification evidence
+
+```bash
+make check
+```
+
+```bash
+.venv/bin/python -m idor_lens schema --out docs/idor-lens.schema.json
+.venv/bin/python - <<'PY'
+# local matrix smoke harness:
+# starts HTTP server, runs `idor_lens run`, then `idor_lens summarize`
+PY
+```
+
 # Update (2026-02-10)
 
 ## Summary

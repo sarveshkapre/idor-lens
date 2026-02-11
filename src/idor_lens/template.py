@@ -112,4 +112,14 @@ endpoints:
     # victim_body_mode: raw
     # victim_content_type: application/json
     # victim_body: '{{"id":123}}'
+    #
+    # Optional endpoint matrix expansion (cartesian product):
+    # path: /items/{{item_id}}
+    # name: item-read-{{item_id}}
+    # victim_body:
+    #   id: "{{item_id}}"
+    # attacker_body:
+    #   id: "{{item_id}}"
+    # matrix:
+    #   item_id: [101, 102, 103]
 """
